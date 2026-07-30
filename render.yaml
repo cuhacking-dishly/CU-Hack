@@ -1,22 +1,120 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+#
+# Complete production topology:
+#   public static frontend -> public Express API -> private RAG/Ollama
+#                                             `-> private PostgreSQL
+#
+# The private retrieval service requires paid persistent compute. Review current
+# Render pricing before creating this Blueprint.
+
 services:
-  - type: web
-    name: recipe-match-backend
-    env: node
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: npm start
+  - type: pserv
+    name: dishly-retrieval
+    runtime: docker
+    region: ohio
+    plan: pro plus
+    dockerContext: .
+    dockerfilePath: ./deploy/render/retrieval.Dockerfile
     envVars:
-      - key: PORT
-        value: 10000
-      - key: CORS_ORIGINS
-        value: "https://your-frontend-url.vercel.app" # REPLACE THIS AFTER FRONTEND DEPLOYMENT
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: GEMINI_MODEL
-        value: gemini-3.5-flash
-      - key: GEMINI_TIMEOUT_MS
-        value: 30000
-      - key: SPOONACULAR_API_KEY
-        sync: false
-      - key: SPOONACULAR_TIMEOUT_MS
+      - key: DISHLY_SERVICE_HOST
+        value: 0.0.0.0
+      - key: DISHLY_SERVICE_PORT
         value: 8000
+      - key: DISHLY_SERVICE_TOKEN
+        generateValue: true
+      - key: DISHLY_AUTO_BUILD_INDEX
+        value: "false"
+      - key: OLLAMA_EMBEDDING_MODEL
+        value: embeddinggemma
+      - key: OLLAMA_PARSER_MODEL
+        value: qwen3:4b-instruct
+      - key: OLLAMA_EMBEDDING_DIMENSION
+        value: "768"
+      - key: OLLAMA_PARSER_TIMEOUT_SECONDS
+        value: "180"
+      - key: OLLAMA_MAX_LOADED_MODELS
+        value: "2"
+      - key: OLLAMA_NUM_PARALLEL
+        value: "1"
+    disk:
+      name: dishly-models
+      mountPath: /var/lib/dishly
+      sizeGB: 10
+
+  - type: web
+    name: dishly-api
+    runtime: node
+    region: ohio
+    plan: starter
+    rootDir: backend
+    buildCommand: npm ci
+    preDeployCommand: npm run db:migrate
+    startCommand: npm start
+    healthCheckPath: /api/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dishly-postgres
+          property: connectionString
+      - key: REQUIRE_PERSISTENT_STORE
+        value: "true"
+      - key: RETRIEVAL_SERVICE_HOSTPORT
+        fromService:
+          type: pserv
+          name: dishly-retrieval
+          property: hostport
+      - key: RETRIEVAL_SERVICE_TOKEN
+        fromService:
+          type: pserv
+          name: dishly-retrieval
+          envVarKey: DISHLY_SERVICE_TOKEN
+      - key: RETRIEVAL_TIMEOUT_MS
+        value: "120000"
+      - key: GOAL_PARSER_TIMEOUT_MS
+        value: "300000"
+      - key: CORS_ORIGINS
+        fromService:
+          type: web
+          name: dishly-web
+          envVarKey: RENDER_EXTERNAL_URL
+
+  - type: web
+    name: dishly-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_ORIGIN
+        fromService:
+          type: web
+          name: dishly-api
+          envVarKey: RENDER_EXTERNAL_URL
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+databases:
+  - name: dishly-postgres
+    region: ohio
+    plan: basic-256mb
+    postgresMajorVersion: "18"
+    databaseName: dishly
+    user: dishly
+    ipAllowList: []

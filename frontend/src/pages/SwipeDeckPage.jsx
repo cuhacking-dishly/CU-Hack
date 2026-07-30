@@ -6,7 +6,7 @@ import {
   useTransform,
 } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "../router.jsx";
 import Button from "../components/Button.jsx";
 import BrandLogo from "../components/BrandLogo.jsx";
 import {
@@ -28,6 +28,13 @@ import {
   normalizeImageUrl,
 } from "../utils/recipe.js";
 import { getFlyOutDistance, getSwipeDirection } from "../utils/swipe.js";
+import {
+  CLOSEST_MATCH_MODE,
+  createDefaultRecipeMatch,
+  EXACT_MATCH_MODE,
+  normalizeMatchReasons,
+  normalizeRecipeMatch,
+} from "../utils/recipeMatch.js";
 import "./SwipeDeckPage.css";
 
 const PAGE_SIZE = 10;
@@ -40,15 +47,21 @@ function createEmptyDeck() {
     nextOffset: 0,
     hasMore: false,
     goalUpdatedAt: "",
+    match: createDefaultRecipeMatch(),
   };
 }
 
-function normalizeRecipePage(response, requestedOffset) {
+function normalizeRecipePage(response, requestedOffset, requestedMatchMode) {
   if (!response || typeof response !== "object" || Array.isArray(response)) {
     throw new Error("Invalid recipe page");
   }
 
   const { pagination } = response;
+  const hasMatchMetadata = Object.prototype.hasOwnProperty.call(response, "match");
+  const match = normalizeRecipeMatch(response.match, {
+    expectedMode: requestedMatchMode,
+    allowMissing: !hasMatchMetadata,
+  });
   if (
     !Array.isArray(response.recipes) ||
     !pagination ||
@@ -65,7 +78,8 @@ function normalizeRecipePage(response, requestedOffset) {
     pagination.count < 0 ||
     pagination.count > 20 ||
     pagination.count !== response.recipes.length ||
-    typeof pagination.hasMore !== "boolean"
+    typeof pagination.hasMore !== "boolean" ||
+    !match
   ) {
     throw new Error("Invalid recipe pagination");
   }
@@ -84,6 +98,7 @@ function normalizeRecipePage(response, requestedOffset) {
     recipes,
     nextOffset,
     hasMore: pagination.hasMore && nextOffset <= MAX_RECIPE_OFFSET,
+    match,
   };
 }
 
@@ -96,6 +111,8 @@ function SwipeDeckPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [swipeError, setSwipeError] = useState("");
   const [loadMoreError, setLoadMoreError] = useState("");
+  const [closestError, setClosestError] = useState("");
+  const [isLoadingClosest, setIsLoadingClosest] = useState(false);
   const [swipeRequest, setSwipeRequest] = useState(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const isMountedRef = useRef(true);
@@ -104,6 +121,7 @@ function SwipeDeckPage() {
   const pendingSwipeControllersRef = useRef(new Set());
   const pageRequestControllerRef = useRef(null);
   const loadMoreInFlightRef = useRef(false);
+  const closestRequestInFlightRef = useRef(false);
   const stateHeadingRef = useRef(null);
 
   const commitDeck = useCallback((nextDeckOrUpdater) => {
@@ -141,6 +159,9 @@ function SwipeDeckPage() {
       setErrorMessage("");
       setSwipeError("");
       setLoadMoreError("");
+      setClosestError("");
+      setIsLoadingClosest(false);
+      closestRequestInFlightRef.current = false;
 
       try {
         const goal = await getCurrentGoal(USER_ID, { signal: controller.signal });
@@ -165,12 +186,13 @@ function SwipeDeckPage() {
         }
 
         const response = await getRecipes(USER_ID, {
+          matchMode: EXACT_MATCH_MODE,
           signal: controller.signal,
           params: { limit: PAGE_SIZE, offset: 0 },
         });
         if (!isCurrent) return;
 
-        const page = normalizeRecipePage(response, 0);
+        const page = normalizeRecipePage(response, 0, EXACT_MATCH_MODE);
         commitDeck({ ...page, currentIndex: 0, goalUpdatedAt });
       } catch (error) {
         if (isCurrent && !controller.signal.aborted) {
@@ -215,13 +237,19 @@ function SwipeDeckPage() {
     pageRequestControllerRef.current = controller;
     const requestedGoalVersion = snapshot.goalUpdatedAt;
     const requestedOffset = snapshot.nextOffset;
+    const requestedMatchMode = snapshot.match.mode;
 
     try {
       const response = await getRecipes(USER_ID, {
+        matchMode: requestedMatchMode,
         signal: controller.signal,
         params: { limit: PAGE_SIZE, offset: requestedOffset },
       });
-      const page = normalizeRecipePage(response, requestedOffset);
+      const page = normalizeRecipePage(
+        response,
+        requestedOffset,
+        requestedMatchMode,
+      );
 
       if (
         !isMountedRef.current ||
@@ -239,6 +267,7 @@ function SwipeDeckPage() {
           recipes: [...currentDeck.recipes, ...newRecipes],
           nextOffset: page.nextOffset,
           hasMore: page.hasMore,
+          match: page.match,
         };
       });
     } catch (error) {
@@ -258,7 +287,8 @@ function SwipeDeckPage() {
     }
   }, [commitDeck]);
 
-  const { recipes, currentIndex, hasMore } = deck;
+  const { recipes, currentIndex, hasMore, match } = deck;
+  const isClosestDeck = match.mode === CLOSEST_MATCH_MODE;
 
   const currentRecipe = recipes[currentIndex];
   const nextRecipe = recipes[currentIndex + 1];
@@ -405,6 +435,67 @@ function SwipeDeckPage() {
     void loadMoreRecipes();
   }, [loadMoreRecipes]);
 
+  const showClosestMatches = useCallback(async () => {
+    const snapshot = deckRef.current;
+    if (
+      closestRequestInFlightRef.current ||
+      !snapshot.goalUpdatedAt ||
+      snapshot.match.mode !== EXACT_MATCH_MODE ||
+      !snapshot.match.canShowClosest
+    ) {
+      return;
+    }
+
+    closestRequestInFlightRef.current = true;
+    setIsLoadingClosest(true);
+    setClosestError("");
+
+    const controller = new AbortController();
+    pageRequestControllerRef.current?.abort();
+    pageRequestControllerRef.current = controller;
+    const requestedGoalVersion = snapshot.goalUpdatedAt;
+
+    try {
+      const response = await getRecipes(USER_ID, {
+        matchMode: CLOSEST_MATCH_MODE,
+        signal: controller.signal,
+        params: { limit: PAGE_SIZE, offset: 0 },
+      });
+      const page = normalizeRecipePage(response, 0, CLOSEST_MATCH_MODE);
+
+      if (
+        !isMountedRef.current ||
+        controller.signal.aborted ||
+        deckRef.current.goalUpdatedAt !== requestedGoalVersion
+      ) {
+        return;
+      }
+
+      commitDeck({
+        ...page,
+        currentIndex: 0,
+        goalUpdatedAt: requestedGoalVersion,
+      });
+    } catch (error) {
+      if (isMountedRef.current && !controller.signal.aborted) {
+        setClosestError(
+          getApiErrorMessage(
+            error,
+            "We couldn't load the closest recipe matches. Please try again.",
+          ),
+        );
+      }
+    } finally {
+      if (pageRequestControllerRef.current === controller) {
+        pageRequestControllerRef.current = null;
+      }
+      closestRequestInFlightRef.current = false;
+      if (isMountedRef.current) {
+        setIsLoadingClosest(false);
+      }
+    }
+  }, [commitDeck]);
+
   if (isLoading) {
     return (
       <DeckState title="Building your deck" busy>
@@ -429,10 +520,45 @@ function SwipeDeckPage() {
     );
   }
 
-  if (recipes.length === 0 && !hasMore) {
+  if (recipes.length === 0 && !hasMore && !isClosestDeck) {
+    const canShowClosest = match.canShowClosest;
+
     return (
-      <DeckState title="Try a different goal" headingRef={stateHeadingRef}>
-        <p>No usable recipes were found for this goal. Broaden your filters or try a different craving.</p>
+      <DeckState
+        title="You cooked too hard!"
+        headingRef={stateHeadingRef}
+        busy={isLoadingClosest}
+      >
+        <p>No available recipes match your request.</p>
+        {closestError ? <p className="deck-closest-error" role="alert">{closestError}</p> : null}
+        <div className="deck-state-actions">
+          {canShowClosest ? (
+            <Button
+              variant="primary"
+              onClick={() => void showClosestMatches()}
+              disabled={isLoadingClosest}
+            >
+              {isLoadingClosest ? "Finding closest recipes..." : "Show closest recipes"}
+            </Button>
+          ) : null}
+          <Button
+            variant={canShowClosest ? "secondary" : "primary"}
+            onClick={goToGoalEntry}
+          >
+            Set a new goal
+          </Button>
+        </div>
+      </DeckState>
+    );
+  }
+
+  if (recipes.length === 0 && !hasMore && isClosestDeck) {
+    return (
+      <DeckState title="No closest recipes available" headingRef={stateHeadingRef}>
+        <p>
+          {match.message ||
+            "No recipes satisfy your strict requirements, even after relaxing softer preferences."}
+        </p>
         <Button variant="primary" onClick={goToGoalEntry}>
           Set a new goal
         </Button>
@@ -466,7 +592,14 @@ function SwipeDeckPage() {
     }
 
     return (
-      <DeckState title="You've reached the end of this deck" headingRef={stateHeadingRef}>
+      <DeckState
+        title={
+          isClosestDeck
+            ? "You've reached the end of the closest matches"
+            : "You've reached the end of this deck"
+        }
+        headingRef={stateHeadingRef}
+      >
         <p>Set a new food goal whenever you want to build a different deck.</p>
         <Button variant="primary" onClick={goToGoalEntry}>
           Set a new goal
@@ -481,13 +614,13 @@ function SwipeDeckPage() {
       : 0;
 
   return (
-    <main className="swipe-deck-page">
+    <main className={`swipe-deck-page${isClosestDeck ? " deck-closest-mode" : ""}`}>
       <header className="deck-header">
         <div className="deck-header-lead">
           <BrandLogo className="deck-brand" />
-          <h1>Swipe your matches</h1>
+          <h1>{isClosestDeck ? "Swipe your closest matches" : "Swipe your matches"}</h1>
           <p className="deck-progress" role="status" aria-live="polite" aria-atomic="true">
-            Match {currentIndex + 1}: {currentRecipe.title || "Untitled recipe"}
+            {isClosestDeck ? "Closest match" : "Match"} {currentIndex + 1}: {currentRecipe.title || "Untitled recipe"}
           </p>
           <div
             className="deck-progress-track"
@@ -518,21 +651,32 @@ function SwipeDeckPage() {
         </div>
       </header>
 
+      {isClosestDeck ? (
+        <aside className="deck-match-notice" aria-label="Closest recipe results">
+          <strong>Closest safe matches</strong>
+          <span>
+            Softer preferences may differ, but your allergy and vegan requirements remain applied.
+          </span>
+          {match.message ? <span>{match.message}</span> : null}
+        </aside>
+      ) : null}
+
       <section
         className="deck-workspace"
-        aria-label="Recipe swipe deck"
+        aria-label={isClosestDeck ? "Closest recipe swipe deck" : "Recipe swipe deck"}
         aria-busy={isSwiping || isLoadingMore || undefined}
       >
         <div className="deck-card-stage">
           {nextRecipe ? (
             <article key={nextRecipe.id} className="recipe-card recipe-card-next" aria-hidden="true">
-              <RecipeCardContent recipe={nextRecipe} />
+              <RecipeCardContent recipe={nextRecipe} matchMode={match.mode} />
             </article>
           ) : null}
 
           <SwipeableRecipeCard
             key={currentRecipe.id}
             recipe={currentRecipe}
+            matchMode={match.mode}
             swipeRequest={swipeRequest}
             disabled={isSwiping}
             onSwipeStart={handleSwipeStart}
@@ -613,7 +757,15 @@ function DeckState({ title, children, busy = false, role, headingRef }) {
   );
 }
 
-function SwipeableRecipeCard({ recipe, swipeRequest, disabled, onSwipeStart, onSwipeComplete, onSwipeSettled }) {
+function SwipeableRecipeCard({
+  recipe,
+  matchMode,
+  swipeRequest,
+  disabled,
+  onSwipeStart,
+  onSwipeComplete,
+  onSwipeSettled,
+}) {
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-240, 0, 240], [-8, 0, 8]);
   const likeStampOpacity = useTransform(x, [30, 130], [0, 1]);
@@ -717,17 +869,22 @@ function SwipeableRecipeCard({ recipe, swipeRequest, disabled, onSwipeStart, onS
       >
         Nope
       </motion.div>
-      <RecipeCardContent recipe={recipe} titleId={titleId} />
+      <RecipeCardContent recipe={recipe} titleId={titleId} matchMode={matchMode} />
     </motion.article>
   );
 }
 
-function RecipeCardContent({ recipe, titleId }) {
+function RecipeCardContent({ recipe, titleId, matchMode }) {
   const macros = recipe.macros && typeof recipe.macros === "object" && !Array.isArray(recipe.macros) ? recipe.macros : {};
   const title = typeof recipe.title === "string" && recipe.title.trim() ? recipe.title.trim() : "Untitled recipe";
   const servings = formatServings(recipe.servings);
   const ingredients = getRecipeTextList(recipe.ingredients);
   const instructions = getRecipeTextList(recipe.instructions);
+  // Express exposes validated per-recipe metadata under `match`. Keep the
+  // flat fallback only for an older cached deck written before that contract.
+  const matchReasons = normalizeMatchReasons(
+    recipe.match?.reasons ?? recipe.matchReasons,
+  );
   const sourceUrl = getSafeHttpUrl(recipe.sourceUrl);
   const sourceName =
     typeof recipe.sourceName === "string" && recipe.sourceName.trim()
@@ -743,13 +900,15 @@ function RecipeCardContent({ recipe, titleId }) {
 
       <div className="recipe-card-details">
         <header className="recipe-card-summary">
-          <p className="recipe-card-label">Current recipe</p>
+          <p className="recipe-card-label">
+            {matchMode === CLOSEST_MATCH_MODE ? "Closest match" : "Current recipe"}
+          </p>
           <h2 id={titleId}>{title}</h2>
           <p className="recipe-card-meta">
             {[formatTime(recipe.readyInMinutes), servings].filter(Boolean).join(" - ")}
           </p>
           {showLegacyMetadataFallback ? <p className="recipe-card-meta">
-            {formatTime(recipe.readyInMinutes)}{servings ? ` Â· ${servings}` : ""}
+            {formatTime(recipe.readyInMinutes)}{servings ? ` · ${servings}` : ""}
           </p> : null}
         </header>
 
@@ -759,6 +918,16 @@ function RecipeCardContent({ recipe, titleId }) {
           <small>{formatMacro(macros.carbs_g)} carbs / {formatMacro(macros.fat_g)} fat</small>
           <small className="recipe-card-serving-note">Per serving</small>
         </div>
+        {matchReasons.length > 0 ? (
+          <section className="recipe-card-match-reasons">
+            <h3>
+              {matchMode === CLOSEST_MATCH_MODE ? "Why it's close" : "Why it matches"}
+            </h3>
+            <ul>
+              {matchReasons.map((reason) => <li key={reason}>{reason}</li>)}
+            </ul>
+          </section>
+        ) : null}
         <RecipeTextSection
           title="Ingredients"
           emptyText="Ingredients unavailable for this recipe."

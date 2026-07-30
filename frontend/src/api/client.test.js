@@ -2,12 +2,14 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import {
   API_TIMEOUT_MS,
+  GOAL_PARSE_TIMEOUT_MS,
   getCurrentGoal,
   getApiErrorMessage,
   getRecipeById,
   getRecipes,
   logSwipe,
   parseGoal,
+  resolveApiBaseUrl,
   saveGoal,
 } from "./client.js";
 import { server } from "../test/server.js";
@@ -29,8 +31,20 @@ const recipe = {
 };
 
 describe("API client", () => {
+  it("resolves an explicit API base, a hosting origin, and the local default", () => {
+    expect(resolveApiBaseUrl({
+      configuredBaseUrl: " https://api.example.test/custom/ ",
+      configuredOrigin: "https://ignored.example.test",
+    })).toBe("https://api.example.test/custom");
+    expect(resolveApiBaseUrl({
+      configuredOrigin: " https://api.example.test/// ",
+    })).toBe("https://api.example.test/api");
+    expect(resolveApiBaseUrl()).toBe(API_URL);
+  });
+
   it("allows the backend's provider deadline to complete before timing out", () => {
     expect(API_TIMEOUT_MS).toBe(35_000);
+    expect(GOAL_PARSE_TIMEOUT_MS).toBe(190_000);
   });
 
   it.each([
@@ -147,7 +161,7 @@ describe("API client", () => {
     });
   });
 
-  it("gets recipes with the user id while preserving caller query config", async () => {
+  it("gets a selected recipe-match mode while preserving caller query config", async () => {
     let requestDetails;
     const response = {
       recipes: [recipe],
@@ -160,6 +174,7 @@ describe("API client", () => {
         requestDetails = {
           header: request.headers.get("x-request-id"),
           limit: url.searchParams.get("limit"),
+          matchMode: url.searchParams.get("matchMode"),
           offset: url.searchParams.get("offset"),
           userId: url.searchParams.get("userId"),
         };
@@ -171,15 +186,45 @@ describe("API client", () => {
     await expect(
       getRecipes("demo-user-1", {
         ...requestConfig,
-        params: { limit: 10, offset: 20 },
+        matchMode: "closest",
+        params: { limit: 10, matchMode: "exact", offset: 20 },
       }),
     ).resolves.toEqual(response);
     expect(requestDetails).toEqual({
       header: "frontend-test",
       limit: "10",
+      matchMode: "closest",
       offset: "20",
       userId: "demo-user-1",
     });
+  });
+
+  it("rejects an unsupported recipe-match mode before making a request", async () => {
+    await expect(getRecipes("demo-user-1", { matchMode: "unsafe" })).rejects.toThrow(
+      "matchMode must be exact or closest",
+    );
+  });
+
+  it("defaults recipe requests to exact matching", async () => {
+    let requestedMode;
+    server.use(
+      http.get(`${API_URL}/recipes`, ({ request }) => {
+        requestedMode = new URL(request.url).searchParams.get("matchMode");
+        return HttpResponse.json({
+          recipes: [],
+          pagination: { limit: 10, offset: 0, count: 0, hasMore: false },
+          match: {
+            mode: "exact",
+            canShowClosest: false,
+            message: null,
+            semanticProvider: "ollama",
+          },
+        });
+      }),
+    );
+
+    await getRecipes("demo-user-1");
+    expect(requestedMode).toBe("exact");
   });
 
   it("encodes a recipe id and forwards config to the detail request", async () => {

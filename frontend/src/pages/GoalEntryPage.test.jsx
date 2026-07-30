@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "../router.jsx";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseGoal, saveGoal } from "../api/client.js";
 import { USER_ID } from "../constants.js";
@@ -451,7 +451,10 @@ describe("GoalEntryPage", () => {
     await user.type(screen.getByLabelText("Your food goal"), "high protein");
     await user.click(screen.getByRole("button", { name: "Start swiping" }));
 
-    expect(await screen.findByRole("alert")).toBeVisible();
-    expect(readDeckSession(USER_ID, oldGoalVersion)).toEqual(oldDeck);
+    const alert = await screen.findByRole("alert");
+    // Framer Motion can insert the alert before its parent finishes the
+    // entrance animation; wait for the user-visible state, not just the DOM.
+    await waitFor(() => expect(alert).toBeVisible());
+    expect(readDeckSession(USER_ID, oldGoalVersion)).toMatchObject(oldDeck);
   });
 });

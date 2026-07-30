@@ -12,9 +12,8 @@ const ALLOWED_DIETS = Object.freeze([
   "whole30",
 ]);
 
-// Keep these values aligned with Spoonacular's documented complex-search
-// vocabulary. We intentionally store the provider's canonical, lower-case
-// values so a saved goal is stable regardless of how the UI or model phrases it.
+// Dishly stores one canonical, lower-case cuisine vocabulary so a saved goal is
+// stable regardless of how the UI or local model phrases it.
 const ALLOWED_CUISINES = Object.freeze([
   "african",
   "asian",

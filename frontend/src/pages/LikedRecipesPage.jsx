@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "../router.jsx";
 import Button from "../components/Button.jsx";
 import BrandLogo from "../components/BrandLogo.jsx";
 import { USER_ID } from "../constants.js";

@@ -29,7 +29,17 @@ The frontend calls `http://localhost:3000/api` by default. A different backend c
 VITE_API_BASE_URL=http://localhost:3000/api
 ```
 
-Every `VITE_` value is embedded in browser code. Never place Gemini, Spoonacular, ElevenLabs, or other secrets in a frontend environment file.
+Hosting platforms can instead provide only the public Express origin; Dishly
+appends `/api`:
+
+```dotenv
+VITE_API_ORIGIN=https://dishly-api.example.com
+```
+
+`VITE_API_BASE_URL` takes precedence when both values are present. Every `VITE_`
+value is embedded in browser code. Never place PostgreSQL, retrieval, Ollama,
+provider credentials, private-service tokens, or other secrets in a frontend
+environment file.
 
 ## Commands
 
@@ -52,22 +62,27 @@ The browser suite uses the Microsoft Edge installation already present on the de
 
 | Route | Screen | Behavior |
 | --- | --- | --- |
-| `/` | Goal entry | Captures a typed craving or filter-only goal. Its full-width, search-attached Recipe filters popover turns calorie, protein, and carbohydrate entries into a ±20% per-serving range; accepts free-form culture and allergy language, and offers Breakfast/Lunch & dinner/Dessert. Culture/allergy text is interpreted by Gemini, including multiple culture alternatives and non-standard ingredient allergies. Loading this route does not make an API request. |
+| `/` | Goal entry | Captures a typed craving or filter-only goal. Its full-width, search-attached Recipe filters popover turns calorie, protein, and carbohydrate entries into a ±20% per-serving range; accepts free-form culture and allergy language, and offers Breakfast/Lunch & dinner/Dessert. Culture/allergy text is interpreted by the local parser, including multiple culture alternatives and non-standard ingredient allergies. Loading this route does not make an API request. |
 | `/deck` | Swipe deck | Requires a saved goal, restores this tab's current deck when possible, and fetches additional recipe pages as needed. |
+| `/liked` | Liked recipes | Lists accepted recipes from the current browser session and passes the exact DTO into detail navigation. |
 | `/recipe/:id` | Recipe detail | Reuses the exact accepted Recipe DTO during in-app navigation; direct links fetch that numeric recipe ID. |
 
 The demo user is fixed as `demo-user-1` in `src/constants.js`. There is no authentication. Deck state is cached in `sessionStorage` for the current browser tab under the demo user and the saved goal's `updatedAt` value. A successful new goal clears older deck snapshots. With working session storage, returning from an accepted recipe or refreshing `/deck` resumes at the next unreviewed card without repeating the recipe search. If browser storage is blocked, full, or corrupt, a runtime memory fallback still preserves in-app detail-to-deck returns; a full page refresh then rebuilds the deck because browser persistence was unavailable.
 
-Recipe IDs are canonical positive JavaScript-safe integer strings, matching Spoonacular and the backend contract. Both left and right actions wait for `POST /swipe` to succeed before progress is advanced. A failed swipe returns the same card and can be retried.
+Recipe IDs are canonical positive JavaScript-safe integer strings matching the backend contract. Both left and right actions wait for `POST /swipe` to succeed before progress is advanced. A failed swipe returns the same card and can be retried.
 
 The deck requests `10` recipes at a time with explicit `limit` and `offset` values, advances by the returned `offset + limit`, and deduplicates IDs across pages. It uses `pagination.hasMore` to prefetch another page near the end. Since the API does not expose a provider-wide total, the interface announces `Match N` and describes only the end of the current deck rather than claiming the user has seen every possible provider match.
 
 ## Testing strategy
 
 - Vitest and Testing Library cover the API boundary, route behavior, goal submission, swipe state machine, failure recovery, recipe detail, accessibility semantics, and formatting helpers.
+- The small client-only router has direct tests for route matching, decoded
+  parameters, browser and memory history, navigation state, modified links, and
+  rejection of cross-origin, protocol-relative, backslash, and script
+  destinations. It intentionally exposes no server-rendering or action surface.
 - MSW intercepts the real Axios requests only inside tests. It is a development dependency and creates no production fallback or mock-data path.
 - The standard Playwright browser suite runs against Microsoft Edge and a real Vite server, but deliberately intercepts `/api` with contract-faithful fixtures. It covers browser flow, responsive layout at laptop, 390px, and 320px viewports, and reduced-motion behavior; it is not a frontend-to-Express test.
-- The separate full-stack browser check starts the actual Express routes with deterministic test-only Gemini and Spoonacular boundaries. It sends the production Axios client across the real CORS boundary and verifies goal storage, pagination, swipe storage, exact detail navigation, and deck resume without using provider quota.
+- The separate full-stack browser check starts the actual Express routes with deterministic test-only private-service boundaries. It sends the production Axios client across the real CORS boundary and verifies goal storage, pagination, swipe storage, exact detail navigation, and deck resume without model inference.
 - `test:coverage` enforces 85% statements, lines, and functions plus 80% branches across production JavaScript.
 
 The full-stack suite defaults to ports `3000` and `5173`. If either belongs to
@@ -90,17 +105,17 @@ All network access is centralized in `src/api/client.js` and uses the backend `/
 - `GET /recipes/:id`
 - `POST /swipe`
 
-Recipe pages include `{ recipes, pagination: { limit, offset, count, hasMore } }`. `count` describes the current normalized page, while `hasMore` controls whether the deck should request another page. API helpers return `response.data`, accept an optional Axios request config for cancellation, and let failures propagate to page-level error handling. Their 35-second client timeout is deliberately longer than the backend's 30-second Gemini deadline. The frontend never calls Gemini, Spoonacular, or another recipe provider directly.
+Recipe pages include `{ recipes, pagination: { limit, offset, count, hasMore } }`. `count` describes the current normalized page, while `hasMore` controls whether the deck should request another page. API helpers return `response.data`, accept an optional Axios request config for cancellation, and let failures propagate to page-level error handling. The frontend never calls Ollama, Python retrieval, or a recipe provider directly.
 
 The nutrition target inputs are optional and use whole numbers. Each entered
 target searches a per-serving range ±20% around that value; blank controls leave
 the natural-language filter unchanged. Culture and allergy fields are free-form:
-people can ask for “Chinese or Italian” and Gemini preserves both as OR cuisine
-alternatives, or name any allergy/ingredient (including one outside Spoonacular’s
+people can ask for “Chinese or Italian” and the local parser preserves both as OR cuisine
+alternatives, or name any allergy/ingredient (including one outside Dishly's
 standard intolerance list) for an explicit exclusion. The meal control maps
 Breakfast, Lunch & dinner, and Dessert to provider recipe types. A culture or
-allergy entry deliberately invokes Gemini even with no typed craving, while a
-meal-only or nutrition-only search remains instant and parser-free. Gemini first
+allergy entry deliberately invokes local parsing even with no typed craving, while a
+meal-only or nutrition-only search remains instant and parser-free. The parser first
 interprets conversational intent and then categorizes craving, culture, meal,
 allergy, diet, time, and nutrition constraints. The fixed-height filters panel
 uses a subtle thin scroll indicator so every option remains reachable without
@@ -123,6 +138,7 @@ src/
   pages/SwipeDeckPage.*      Recipe deck and swipe behavior
   pages/RecipeDetailPage.*   Selected recipe and nutrition detail
   pages/LikedRecipesPage.*   Session-liked recipe grid
+  router.*                   Same-origin client routing and history
   test/                      Shared Vitest and MSW setup
   utils/                     Tested formatting and swipe geometry
   App.jsx                    Route table and route-level behavior
@@ -131,7 +147,10 @@ src/
 e2e/                         Edge-backed browser regressions
 ```
 
-Because the app uses `BrowserRouter`, a production web host must rewrite direct requests such as `/deck` and `/recipe/12345` to `index.html`.
+Because the app uses browser history routing, a production web host must rewrite direct requests such as `/deck` and `/recipe/12345` to `index.html`.
+`vercel.json` provides the fallback and response-hardening headers for Vercel.
+The Render Blueprint defines the equivalent static-site rewrite. See
+[`../docs/PRODUCTION_DEPLOYMENT.md`](../docs/PRODUCTION_DEPLOYMENT.md).
 
 ## UI & motion system
 

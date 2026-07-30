@@ -1,4 +1,8 @@
 import { isUsableRecipe } from "./recipe.js";
+import {
+  EXACT_MATCH_MODE,
+  normalizeRecipeMatch,
+} from "./recipeMatch.js";
 
 const STORAGE_PREFIX = "recipe-match:deck:v1:";
 const MAX_NEXT_OFFSET = 920;
@@ -29,6 +33,11 @@ function normalizeSnapshot(value) {
 
   const { recipes, currentIndex, nextOffset, hasMore } = value;
   const recipeIds = Array.isArray(recipes) ? recipes.map((recipe) => recipe?.id) : [];
+  const hasMatchMetadata = Object.prototype.hasOwnProperty.call(value, "match");
+  const match = normalizeRecipeMatch(value.match, {
+    expectedMode: hasMatchMetadata ? null : EXACT_MATCH_MODE,
+    allowMissing: !hasMatchMetadata,
+  });
   if (
     !Array.isArray(recipes) ||
     !recipes.every(isUsableRecipe) ||
@@ -39,12 +48,16 @@ function normalizeSnapshot(value) {
     !Number.isInteger(nextOffset) ||
     nextOffset < 0 ||
     nextOffset > MAX_NEXT_OFFSET ||
-    typeof hasMore !== "boolean"
+    typeof hasMore !== "boolean" ||
+    !match ||
+    // Empty legacy snapshots predate the closest-match action. Refetch them so
+    // users are not stranded in a cached no-results screen without the button.
+    (!hasMatchMetadata && recipes.length === 0)
   ) {
     return null;
   }
 
-  return { recipes, currentIndex, nextOffset, hasMore };
+  return { recipes, currentIndex, nextOffset, hasMore, match };
 }
 
 function cloneSnapshot(snapshot) {

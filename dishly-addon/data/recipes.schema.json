@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dishly.local/schemas/recipes.schema.json",
+  "title": "Dishly approved recipe corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "recipes"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "recipes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/recipe" }
+    }
+  },
+  "$defs": {
+    "nonEmptyText": { "type": "string", "minLength": 1 },
+    "nullableNumber": { "type": ["number", "null"], "minimum": 0 },
+    "nullableInteger": { "type": ["integer", "null"], "minimum": 0 },
+    "stringList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonEmptyText" }
+    },
+    "publicUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "title", "cuisine", "meal_type", "protein_grams", "calories",
+        "carbs_grams", "fat_grams", "time_minutes", "servings", "vegan",
+        "allergens", "allergen_evidence", "ingredients", "instructions",
+        "description", "source_url", "image_url", "source_name",
+        "source_verified_at", "image_width", "image_height",
+        "image_quality_verified", "nutrition_basis"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+        "title": { "$ref": "#/$defs/nonEmptyText" },
+        "cuisine": { "$ref": "#/$defs/nonEmptyText" },
+        "meal_type": { "$ref": "#/$defs/nonEmptyText" },
+        "protein_grams": { "$ref": "#/$defs/nullableNumber" },
+        "calories": { "$ref": "#/$defs/nullableNumber" },
+        "carbs_grams": { "$ref": "#/$defs/nullableNumber" },
+        "fat_grams": { "$ref": "#/$defs/nullableNumber" },
+        "time_minutes": { "$ref": "#/$defs/nullableInteger" },
+        "servings": { "$ref": "#/$defs/nullableNumber" },
+        "vegan": { "type": "boolean" },
+        "allergens": { "$ref": "#/$defs/stringList" },
+        "allergen_evidence": { "$ref": "#/$defs/stringList" },
+        "ingredients": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonEmptyText" }
+        },
+        "instructions": { "$ref": "#/$defs/stringList" },
+        "description": { "$ref": "#/$defs/nonEmptyText" },
+        "source_url": { "$ref": "#/$defs/publicUrl" },
+        "image_url": { "$ref": "#/$defs/publicUrl" },
+        "source_name": { "$ref": "#/$defs/nonEmptyText" },
+        "source_verified_at": { "type": "string", "format": "date" },
+        "image_width": { "type": "integer", "minimum": 500 },
+        "image_height": { "type": "integer", "minimum": 500 },
+        "image_quality_verified": { "const": true },
+        "nutrition_basis": {
+          "enum": ["per serving", "per recipe", "unknown"]
+        }
+      }
+    }
+  }
+}

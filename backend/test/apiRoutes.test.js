@@ -8,16 +8,19 @@ const goalRoutesPath = require.resolve("../src/routes/goalRoutes");
 const recipeRoutesPath = require.resolve("../src/routes/recipeRoutes");
 const swipeRoutesPath = require.resolve("../src/routes/swipeRoutes");
 const routeUtilsPath = require.resolve("../src/routes/routeUtils");
-const geminiServicePath = require.resolve("../src/services/geminiService");
 const goalFilterPath = require.resolve("../src/services/goalFilter");
-const spoonacularServicePath = require.resolve("../src/services/spoonacularService");
+const retrievalServicePath = require.resolve("../src/services/retrievalService");
 const memoryStorePath = require.resolve("../src/store/memoryStore");
+const storePath = require.resolve("../src/store");
 
 const managedEnvironmentKeys = [
   "CORS_ORIGINS",
-  "GEMINI_API_KEY",
+  "DATABASE_URL",
   "PORT",
-  "SPOONACULAR_API_KEY",
+  "REQUIRE_PERSISTENT_STORE",
+  "RETRIEVAL_SERVICE_HOSTPORT",
+  "RETRIEVAL_SERVICE_TOKEN",
+  "RETRIEVAL_SERVICE_URL",
 ];
 const originalEnvironment = Object.fromEntries(
   managedEnvironmentKeys.map((key) => [key, process.env[key]])
@@ -30,10 +33,10 @@ function clearAppModules() {
     recipeRoutesPath,
     swipeRoutesPath,
     routeUtilsPath,
-    geminiServicePath,
     goalFilterPath,
-    spoonacularServicePath,
+    retrievalServicePath,
     memoryStorePath,
+    storePath,
   ]) {
     delete require.cache[modulePath];
   }
@@ -76,22 +79,54 @@ function recipeFixture(id = "101", overrides = {}) {
   };
 }
 
+function matchFixture(overrides = {}) {
+  return {
+    mode: "exact",
+    canShowClosest: false,
+    message: null,
+    totalCandidates: 1,
+    semanticProvider: "test",
+    ...overrides,
+  };
+}
+
 function loadApp({
   parseGoal = async () => ({}),
   searchRecipes = async () => [recipeFixture()],
   searchRecipePage,
   getRecipeById = async (id) => recipeFixture(id),
+  checkRetrievalReadiness = async () => true,
 } = {}) {
   clearAppModules();
-  mockModule(geminiServicePath, { parseGoal });
-  mockModule(spoonacularServicePath, {
+  mockModule(retrievalServicePath, {
+    checkRetrievalReadiness,
     getRecipeById,
-    searchRecipePage:
-      searchRecipePage ||
-      (async (filter, pagination) => ({
-        recipes: await searchRecipes(filter, pagination),
-        hasMore: false,
-      })),
+    parseGoal,
+    searchRecipePage: async (goal, options) => {
+      const result = searchRecipePage
+        ? await searchRecipePage(goal, options)
+        : {
+            recipes: await searchRecipes(goal?.parsedFilter || {}, {
+              limit: options.limit,
+              offset: options.offset,
+            }),
+            hasMore: false,
+          };
+      if (result.pagination && result.match) return result;
+      return {
+        recipes: result.recipes,
+        pagination: {
+          limit: options.limit,
+          offset: options.offset,
+          count: result.recipes.length,
+          hasMore: result.hasMore,
+        },
+        match: matchFixture({
+          mode: options.matchMode,
+          totalCandidates: result.recipes.length,
+        }),
+      };
+    },
     searchRecipes,
   });
   return require("../src/server");
@@ -202,6 +237,7 @@ test("API routes expose the complete frontend contract and persist swipes", asyn
     assertResponse(recipes, 200, {
       recipes: [recipeFixture("101")],
       pagination: { limit: 2, offset: 20, count: 1, hasMore: false },
+      match: matchFixture(),
     });
     assert.deepEqual(searchCalls, [
       {
@@ -242,6 +278,7 @@ test("API routes expose the complete frontend contract and persist swipes", asyn
       })),
       [{ userId: "demo-user-1", recipeId: "12345", direction: "right" }]
     );
+    assert.equal(getSwipes("demo-user-1")[0].goalUpdatedAt, savedGoal.body.updatedAt);
 
     assertResponse(await request(baseUrl, "/api/goal/current?userId=missing"), 200, null);
   });
@@ -249,10 +286,9 @@ test("API routes expose the complete frontend contract and persist swipes", asyn
 
 test("health, readiness, cache headers, and framework headers are deterministic", async () => {
   process.env.CORS_ORIGINS = "*";
-  process.env.GEMINI_API_KEY = " ";
   process.env.PORT = "invalid-only-when-imported";
-  process.env.SPOONACULAR_API_KEY = " ";
-  const app = loadApp();
+  let retrievalReady = false;
+  const app = loadApp({ checkRetrievalReadiness: async () => retrievalReady });
 
   await withTestServer(app, async (baseUrl) => {
     const health = await request(baseUrl, "/api/health", {
@@ -266,15 +302,14 @@ test("health, readiness, cache headers, and framework headers are deterministic"
     const unavailable = await request(baseUrl, "/api/ready");
     assertResponse(unavailable, 503, {
       ok: false,
-      services: { gemini: false, spoonacular: false },
+      services: { retrieval: false, storage: true },
     });
 
-    process.env.GEMINI_API_KEY = "gemini-secret";
-    process.env.SPOONACULAR_API_KEY = "spoonacular-secret";
+    retrievalReady = true;
     const ready = await request(baseUrl, "/api/ready");
     assertResponse(ready, 200, {
       ok: true,
-      services: { gemini: true, spoonacular: true },
+      services: { retrieval: true, storage: true },
     });
     assert.doesNotMatch(ready.raw, /secret/);
   });
@@ -513,6 +548,7 @@ test("recipe pagination defaults are passed to the provider and returned to clie
     assertResponse(await request(baseUrl, "/api/recipes?userId=new-user"), 200, {
       recipes: [],
       pagination: { limit: 10, offset: 0, count: 0, hasMore: false },
+      match: matchFixture({ totalCandidates: 0 }),
     });
     assert.deepEqual(calls, [{ filter: {}, pagination: { limit: 10, offset: 0 } }]);
   });
@@ -527,40 +563,98 @@ test("recipe pagination preserves provider continuation independently of normali
     assertResponse(await request(baseUrl, "/api/recipes?userId=user&limit=10&offset=20"), 200, {
       recipes: [recipeFixture("101")],
       pagination: { limit: 10, offset: 20, count: 1, hasMore: true },
+      match: matchFixture(),
     });
   });
 });
 
+test("recipe search forwards match mode and only current-goal swipe exclusions", async () => {
+  const calls = [];
+  const app = loadApp({
+    searchRecipePage: async (goal, options) => {
+      calls.push({ goal, options });
+      return {
+        recipes: [],
+        pagination: { limit: options.limit, offset: options.offset, count: 0, hasMore: false },
+        match: matchFixture({ mode: options.matchMode, totalCandidates: 0 }),
+      };
+    },
+  });
+
+  await withTestServer(app, async (baseUrl) => {
+    assertResponse(
+      await postJson(baseUrl, "/api/goal", {
+        userId: "goal-user",
+        rawText: "vegan dinner",
+        parsedFilter: { diet: "vegan" },
+      }),
+      200,
+      { success: true }
+    );
+    const { addSwipe, getGoal } = require(memoryStorePath);
+    const currentGoal = getGoal("goal-user");
+    addSwipe("goal-user", "101", "left", "2020-01-01T00:00:00.000Z");
+    addSwipe("goal-user", "202", "right", currentGoal.updatedAt);
+
+    const response = await request(
+      baseUrl,
+      "/api/recipes?userId=goal-user&limit=5&offset=10&matchMode=closest"
+    );
+    assertResponse(response, 200, {
+      recipes: [],
+      pagination: { limit: 5, offset: 10, count: 0, hasMore: false },
+      match: matchFixture({ mode: "closest", totalCandidates: 0 }),
+    });
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].goal, currentGoal);
+    assert.deepEqual(calls[0].options, {
+      limit: 5,
+      offset: 10,
+      matchMode: "closest",
+      excludedRecipeIds: ["202"],
+    });
+
+    assertResponse(
+      await request(baseUrl, "/api/recipes?userId=goal-user&matchMode=relaxed"),
+      400,
+      { error: "matchMode must be exact or closest" }
+    );
+    assertResponse(
+      await request(
+        baseUrl,
+        "/api/recipes?userId=goal-user&matchMode=exact&matchMode=closest"
+      ),
+      400,
+      { error: "matchMode must be provided once" }
+    );
+    assert.equal(calls.length, 1);
+  });
+});
+
 test("central error handling preserves typed public errors and redacts internal failures", async () => {
-  const geminiSecret = "gemini sensitive/key?value";
-  const encodedGeminiSecret = encodeURIComponent(geminiSecret);
-  const queryEncodedGeminiSecret = new URLSearchParams({ value: geminiSecret })
-    .toString()
-    .slice("value=".length);
-  process.env.GEMINI_API_KEY = `  ${geminiSecret}  `;
-  process.env.SPOONACULAR_API_KEY = "  spoonacular-sensitive-key  ";
+  process.env.RETRIEVAL_SERVICE_URL = "http://private-retrieval.example/infrastructure-secret";
   const typedError = Object.assign(
-    new Error(`Recipe provider request failed for ${encodedGeminiSecret}`, {
+    new Error("Recipe provider request failed", {
       cause: new Error(
-        `provider status 429 for spoonacular-sensitive-key and ${queryEncodedGeminiSecret}`
+        "provider status 429 at http://private-retrieval.example/infrastructure-secret"
       ),
     }),
     {
       statusCode: 503,
       publicMessage: "Recipe service is temporarily unavailable",
-      code: `SPOONACULAR_RATE_LIMITED:${geminiSecret}`,
+      code: "RETRIEVAL_RATE_LIMITED:http://private-retrieval.example/infrastructure-secret",
       retryable: true,
     }
   );
   const app = loadApp({
     parseGoal: async () => {
-      throw new Error("Gemini SDK secret failure");
+      throw new Error("Ollama local parser transport failure");
     },
     searchRecipes: async () => {
       throw typedError;
     },
     getRecipeById: async () => {
-      throw new Error("Spoonacular raw secret failure");
+      throw new Error("Local corpus detail failure");
     },
   });
   const logged = [];
@@ -575,11 +669,11 @@ test("central error handling preserves typed public errors and redacts internal 
 
       const detail = await request(baseUrl, "/api/recipes/101");
       assertResponse(detail, 500, { error: "Unexpected server error" });
-      assert.doesNotMatch(detail.raw, /Spoonacular raw/);
+      assert.doesNotMatch(detail.raw, /Local corpus detail/);
 
       const parse = await postJson(baseUrl, "/api/parse-goal", { text: "vegan" });
       assertResponse(parse, 500, { error: "Unexpected server error" });
-      assert.doesNotMatch(parse.raw, /Gemini SDK/);
+      assert.doesNotMatch(parse.raw, /Ollama local parser/);
     });
   } finally {
     console.error = originalConsoleError;
@@ -587,15 +681,12 @@ test("central error handling preserves typed public errors and redacts internal 
 
   const serializedLogs = JSON.stringify(logged);
   assert.match(serializedLogs, /provider status 429/);
-  assert.match(serializedLogs, /SPOONACULAR_RATE_LIMITED:\[REDACTED\]/);
+  assert.match(serializedLogs, /RETRIEVAL_RATE_LIMITED:\[REDACTED\]/);
   assert.match(serializedLogs, /"retryable":true/);
   assert.match(serializedLogs, /\[REDACTED\]/);
-  assert.doesNotMatch(serializedLogs, /spoonacular-sensitive-key/);
-  assert.equal(serializedLogs.includes(geminiSecret), false);
-  assert.equal(serializedLogs.includes(encodedGeminiSecret), false);
-  assert.equal(serializedLogs.includes(queryEncodedGeminiSecret), false);
-  assert.match(serializedLogs, /Spoonacular raw secret failure/);
-  assert.match(serializedLogs, /Gemini SDK secret failure/);
+  assert.doesNotMatch(serializedLogs, /private-retrieval\.example/);
+  assert.match(serializedLogs, /Local corpus detail failure/);
+  assert.match(serializedLogs, /Ollama local parser transport failure/);
 });
 
 test("malformed and oversized bodies plus unknown routes return stable JSON errors", async () => {

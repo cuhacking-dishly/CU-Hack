@@ -1,10 +1,25 @@
 import axios from "axios";
+import { EXACT_MATCH_MODE, isRecipeMatchMode } from "../utils/recipeMatch.js";
 
 const DEFAULT_API_BASE_URL = "http://localhost:3000/api";
 export const API_TIMEOUT_MS = 35_000;
+// A cold 4B model can take substantially longer on an ARM board. Only parsing
+// receives this longer deadline; ordinary recipe/API requests stay at 35s.
+export const GOAL_PARSE_TIMEOUT_MS = 190_000;
 
-const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-const baseURL = (configuredBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
+export function resolveApiBaseUrl({ configuredBaseUrl, configuredOrigin } = {}) {
+  const normalizedBaseUrl = configuredBaseUrl?.trim();
+  const normalizedOrigin = configuredOrigin?.trim();
+  const originBaseUrl = normalizedOrigin
+    ? `${normalizedOrigin.replace(/\/+$/, "")}/api`
+    : "";
+  return (normalizedBaseUrl || originBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
+}
+
+const baseURL = resolveApiBaseUrl({
+  configuredBaseUrl: import.meta.env.VITE_API_BASE_URL,
+  configuredOrigin: import.meta.env.VITE_API_ORIGIN,
+});
 
 const client = axios.create({
   baseURL,
@@ -25,7 +40,10 @@ export function getApiErrorMessage(error, fallback) {
 }
 
 export async function parseGoal(text, config = {}) {
-  const response = await client.post("/parse-goal", { text }, config);
+  const response = await client.post("/parse-goal", { text }, {
+    timeout: GOAL_PARSE_TIMEOUT_MS,
+    ...config,
+  });
   return response.data;
 }
 
@@ -47,9 +65,14 @@ export async function getCurrentGoal(userId, config = {}) {
 }
 
 export async function getRecipes(userId, config = {}) {
+  const { matchMode = EXACT_MATCH_MODE, ...requestConfig } = config;
+  if (!isRecipeMatchMode(matchMode)) {
+    throw new TypeError("matchMode must be exact or closest");
+  }
+
   const response = await client.get("/recipes", {
-    ...config,
-    params: { ...config.params, userId },
+    ...requestConfig,
+    params: { ...requestConfig.params, userId, matchMode },
   });
   return response.data;
 }

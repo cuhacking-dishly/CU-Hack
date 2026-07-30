@@ -1,8 +1,8 @@
 const express = require("express");
 
-const { parseGoal } = require("../services/geminiService");
+const { parseGoal } = require("../services/retrievalService");
 const { normalizeGoalFilter } = require("../services/goalFilter");
-const { getGoal, setGoal } = require("../store/memoryStore");
+const { getGoal, setGoal } = require("../store");
 const {
   GOAL_TEXT_MAX_LENGTH,
   USER_ID_MAX_LENGTH,
@@ -32,7 +32,7 @@ router.post(
 
 router.post(
   "/goal",
-  asyncRoute((req, res) => {
+  asyncRoute(async (req, res) => {
     const { userId, rawText } = req.body || {};
     if (isMissingString(userId) || isMissingString(rawText)) {
       throw createHttpError(400, "userId and rawText are required");
@@ -48,19 +48,19 @@ router.post(
     });
     const parsedFilter = normalizeGoalFilter(req.body?.parsedFilter, { strict: true });
 
-    setGoal(normalizedUserId, normalizedRawText, parsedFilter);
+    await setGoal(normalizedUserId, normalizedRawText, parsedFilter);
     return res.json({ success: true });
   })
 );
 
 router.get(
   "/goal/current",
-  asyncRoute((req, res) => {
+  asyncRoute(async (req, res) => {
     const userId = requireBoundedString(requireSingleQueryValue(req.query, "userId"), {
       field: "userId",
       maxLength: USER_ID_MAX_LENGTH,
     });
-    return res.json(getGoal(userId));
+    return res.json(await getGoal(userId));
   })
 );
 

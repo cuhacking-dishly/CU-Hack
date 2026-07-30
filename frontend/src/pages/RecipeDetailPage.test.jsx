@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "../router.jsx";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getRecipeById } from "../api/client.js";
 import RecipeDetailPage from "./RecipeDetailPage.jsx";
@@ -146,7 +146,7 @@ describe("RecipeDetailPage", () => {
   });
 
   it("rejects a noncanonical recipe route before making a backend request", async () => {
-    renderRecipeDetail("/recipe/not-a-spoonacular-id");
+    renderRecipeDetail("/recipe/not-a-recipe-id");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("This recipe link is invalid.");
     expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();

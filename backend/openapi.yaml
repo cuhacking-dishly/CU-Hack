@@ -1,14 +1,14 @@
 openapi: 3.1.0
 info:
   title: Recipe Match Backend API
-  version: 1.3.0
+  version: 1.5.0
   license:
     name: UNLICENSED
     identifier: LicenseRef-UNLICENSED
   description: |
-    Backend contract for natural-language goal parsing, in-memory goal and swipe
-    storage, and normalized Spoonacular recipe data. The API has no authentication
-    and all stored state is erased on process restart.
+    Backend contract for natural-language goal parsing, memory/PostgreSQL goal and
+    swipe storage, and normalized local-retrieval recipe data. The public API has
+    no authentication; production deployments use persistent storage.
 servers:
   - url: /api
     description: API path on the selected backend origin
@@ -18,9 +18,9 @@ tags:
   - name: Goals
     description: Natural-language goal parsing and current-goal storage.
   - name: Recipes
-    description: Normalized Spoonacular search and detail data.
+    description: Validated local-corpus search and detail data.
   - name: Swipes
-    description: In-memory recipe preference recording.
+    description: Recipe preference recording in the selected storage repository.
 security: []
 paths:
   /health:
@@ -28,7 +28,7 @@ paths:
       tags: [Operations]
       operationId: getHealth
       summary: Check process liveness
-      description: Does not validate configuration or contact providers.
+      description: Does not validate configuration or contact upstream services.
       responses:
         "200":
           description: The process can serve HTTP requests.
@@ -46,14 +46,14 @@ paths:
     get:
       tags: [Operations]
       operationId: getReadiness
-      summary: Check provider configuration readiness
+      summary: Check local recipe-service readiness
       description: |
-        Checks only whether both API key environment variables are nonblank. It
-        does not contact Gemini or Spoonacular. The same response schema is used
-        for ready and not-ready states.
+        Contacts the private retrieval service and selected storage repository.
+        Retrieval readiness includes the corpus, parser model, embedding model,
+        and vector index state.
       responses:
         "200":
-          description: Both provider keys are configured.
+          description: Local parsing and retrieval report ready.
           content:
             application/json:
               schema:
@@ -61,12 +61,12 @@ paths:
               example:
                 ok: true
                 services:
-                  gemini: true
-                  spoonacular: true
+                  retrieval: true
+                  storage: true
         "403":
           $ref: "#/components/responses/CorsForbidden"
         "503":
-          description: At least one provider key is not configured.
+          description: Local parsing or retrieval is unavailable/not ready.
           content:
             application/json:
               schema:
@@ -74,8 +74,8 @@ paths:
               example:
                 ok: false
                 services:
-                  gemini: false
-                  spoonacular: true
+                  retrieval: false
+                  storage: true
         "500":
           $ref: "#/components/responses/InternalError"
   /parse-goal:
@@ -93,7 +93,7 @@ paths:
               text: cozy Japanese dessert, no peanuts, under 600 calories
       responses:
         "200":
-          description: The normalized filter parsed by Gemini.
+          description: The normalized filter parsed by local Ollama and safety code.
           content:
             application/json:
               schema:
@@ -196,11 +196,15 @@ paths:
       tags: [Recipes]
       operationId: searchRecipes
       summary: Search recipes for a user's current goal
-      description: Uses an empty filter if the user has no saved goal.
+      description: >-
+        Uses an unconstrained request if the user has no saved goal. Closest
+        mode must be requested explicitly and never relaxes vegan, allergen,
+        named-ingredient, or same-goal swipe exclusions.
       parameters:
         - $ref: "#/components/parameters/UserId"
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/MatchMode"
       responses:
         "200":
           description: One normalized page of recipes.
@@ -215,6 +219,12 @@ paths:
                   offset: 0
                   count: 0
                   hasMore: false
+                match:
+                  mode: exact
+                  canShowClosest: true
+                  message: No exact matches were found.
+                  totalCandidates: 0
+                  semanticProvider: ollama:embeddinggemma
         "400":
           $ref: "#/components/responses/BadRequest"
         "403":
@@ -311,17 +321,28 @@ components:
       name: offset
       in: query
       required: false
-      description: Zero-based Spoonacular result offset.
+      description: Zero-based ranked-corpus result offset.
       schema:
         type: integer
         minimum: 0
         maximum: 900
         default: 0
+    MatchMode:
+      name: matchMode
+      in: query
+      required: false
+      description: >-
+        Exact matching is the default. Closest matching is an explicit second
+        request and still preserves every hard safety/diet exclusion.
+      schema:
+        type: string
+        enum: [exact, closest]
+        default: exact
     RecipeIdPath:
       name: id
       in: path
       required: true
-      description: Canonical positive safe-integer Spoonacular recipe identifier without leading zeroes.
+      description: Canonical positive safe-integer corpus recipe identifier without leading zeroes.
       schema:
         type: string
         pattern: "^[1-9][0-9]*$"
@@ -346,11 +367,11 @@ components:
         services:
           type: object
           additionalProperties: false
-          required: [gemini, spoonacular]
+          required: [retrieval, storage]
           properties:
-            gemini:
+            retrieval:
               type: boolean
-            spoonacular:
+            storage:
               type: boolean
     ParseGoalRequest:
       type: object
@@ -455,7 +476,7 @@ components:
               - spanish
               - thai
               - vietnamese
-          description: One or more canonical Spoonacular cuisines. Multiple values are OR alternatives.
+          description: One or more canonical supported cuisines. Multiple values are OR alternatives.
         mealType:
           type: string
           enum: [breakfast, main course, dessert]
@@ -471,7 +492,7 @@ components:
           items:
             type: string
             enum: [dairy, egg, gluten, grain, peanut, seafood, sesame, shellfish, soy, sulfite, tree nut, wheat]
-          description: Allergy/intolerance categories sent to Spoonacular's safety filter. Results still require ingredient and cross-contact verification.
+          description: Hard allergy/intolerance exclusions sent to local retrieval. Results still require ingredient and cross-contact verification.
         excludeIngredients:
           type: array
           maxItems: 20
@@ -507,6 +528,7 @@ components:
         updatedAt:
           type: string
           format: date-time
+          description: Monotonically unique saved-goal/deck version for this user.
     Recipe:
       type: object
       additionalProperties: false
@@ -543,12 +565,12 @@ components:
           type: [integer, "null"]
           minimum: 0
         servings:
-          type: [integer, "null"]
+          type: [number, "null"]
           minimum: 0
         calories:
-          type: [integer, "null"]
+          type: [number, "null"]
           minimum: 0
-          description: Rounded calories per serving.
+          description: Publisher calories per serving when available.
         macros:
           $ref: "#/components/schemas/Macros"
         diets:
@@ -557,41 +579,61 @@ components:
             type: string
         ingredients:
           type: array
-          description: Plain-text ingredient lines normalized from Spoonacular.
+          description: Plain-text ingredient lines retained from the reviewed source.
           items:
             type: string
             minLength: 1
         instructions:
           type: array
-          description: Plain-text recipe steps normalized from Spoonacular.
+          description: Plain-text recipe steps when the reviewed corpus includes them.
           items:
             type: string
             minLength: 1
         sourceName:
           type: string
-          description: Provider/source attribution label when available.
+          description: Publisher/source attribution label when available.
         sourceUrl:
           type: string
           description: >-
-            Safe absolute HTTP(S) source URL without credentials, using the
-            Spoonacular recipe page as a fallback. Empty string when unavailable.
+            Safe absolute HTTP(S) publisher URL without credentials. Empty
+            string when unavailable.
+        match:
+          $ref: "#/components/schemas/RecipeMatch"
+    RecipeMatch:
+      type: object
+      additionalProperties: false
+      required: [mode, score, reasons]
+      properties:
+        mode:
+          type: string
+          enum: [exact, closest]
+        score:
+          type: [number, "null"]
+          description: Private retrieval score when supplied; null otherwise.
+        reasons:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 300
     Macros:
       type: object
       additionalProperties: false
       required: [protein_g, carbs_g, fat_g]
       properties:
         protein_g:
-          type: [integer, "null"]
+          type: [number, "null"]
           minimum: 0
-          description: Rounded grams per serving.
+          description: Publisher grams per serving when available.
         carbs_g:
-          type: [integer, "null"]
+          type: [number, "null"]
           minimum: 0
-          description: Rounded grams per serving.
+          description: Publisher grams per serving when available.
         fat_g:
-          type: [integer, "null"]
+          type: [number, "null"]
           minimum: 0
-          description: Rounded grams per serving.
+          description: Publisher grams per serving when available.
     Pagination:
       type: object
       additionalProperties: false
@@ -614,12 +656,11 @@ components:
           type: boolean
           description: >-
             Whether another page can be requested within the supported offset
-            range. This is based on Spoonacular pagination metadata or, when that
-            metadata is invalid, whether the raw provider page was full.
+            range, derived from the retrieval service's validated candidate count.
     RecipePage:
       type: object
       additionalProperties: false
-      required: [recipes, pagination]
+      required: [recipes, pagination, match]
       properties:
         recipes:
           type: array
@@ -628,6 +669,30 @@ components:
             $ref: "#/components/schemas/Recipe"
         pagination:
           $ref: "#/components/schemas/Pagination"
+        match:
+          $ref: "#/components/schemas/SearchMatch"
+    SearchMatch:
+      type: object
+      additionalProperties: false
+      required: [mode, canShowClosest, message, totalCandidates, semanticProvider]
+      properties:
+        mode:
+          type: string
+          enum: [exact, closest]
+        canShowClosest:
+          type: boolean
+          description: Whether the UI may offer a separate closest-mode request.
+        message:
+          type: [string, "null"]
+          maxLength: 500
+        totalCandidates:
+          type: integer
+          minimum: 0
+          description: Total ranked candidates before page slicing.
+        semanticProvider:
+          type: string
+          minLength: 1
+          maxLength: 200
     UserId:
       type: string
       minLength: 1
@@ -699,7 +764,7 @@ components:
           example:
             error: Request body is too large
     UpstreamError:
-      description: A provider failed or returned an invalid response.
+      description: The private local service failed or returned an invalid response.
       content:
         application/json:
           schema:
@@ -707,7 +772,7 @@ components:
           example:
             error: Provider is temporarily unavailable
     ServiceUnavailable:
-      description: A required provider is not configured.
+      description: Local Ollama, its models, the corpus, or private retrieval is not ready.
       content:
         application/json:
           schema:
@@ -715,7 +780,7 @@ components:
           example:
             error: Provider is not configured
     GatewayTimeout:
-      description: A provider request exceeded its configured timeout.
+      description: An upstream request exceeded its configured timeout.
       content:
         application/json:
           schema:

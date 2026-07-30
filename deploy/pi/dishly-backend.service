@@ -1,0 +1,24 @@
+[Unit]
+Description=Dishly Express API
+After=network.target dishly-retrieval.service
+Requires=dishly-retrieval.service
+
+[Service]
+Type=simple
+User=dishly
+Group=dishly
+WorkingDirectory=/opt/dishly/CU-Hack/backend
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=RETRIEVAL_SERVICE_URL=http://127.0.0.1:8000
+Environment=RETRIEVAL_TIMEOUT_MS=8000
+Environment=GOAL_PARSER_TIMEOUT_MS=180000
+Environment=CORS_ORIGINS=http://localhost
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

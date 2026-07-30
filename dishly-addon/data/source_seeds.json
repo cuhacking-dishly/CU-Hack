@@ -1,0 +1,851 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "id": "1",
+      "title_hint": "Foolproof Shakshuka",
+      "cuisine": "middle eastern",
+      "meal_type": "breakfast",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 35,
+      "vegan": false,
+      "allergens": [
+        "eggs",
+        "dairy"
+      ],
+      "description": "Eggs poached in a spiced tomato-and-pepper sauce, finished with crumbled feta.",
+      "source_url": "https://cookieandkate.com/foolproof-shakshuka-recipe/"
+    },
+    {
+      "id": "2",
+      "title_hint": "Spaghetti Carbonara",
+      "cuisine": "italian",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 20,
+      "vegan": false,
+      "allergens": [
+        "eggs",
+        "dairy",
+        "gluten"
+      ],
+      "description": "Traditional Roman pasta made creamy with egg, cheese and guanciale, with no cream.",
+      "source_url": "https://www.recipetineats.com/carbonara/"
+    },
+    {
+      "id": "3",
+      "title_hint": "Sheet Pan Chicken Fajitas",
+      "cuisine": "mexican",
+      "meal_type": "dinner",
+      "protein_grams": 31,
+      "calories": 483,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 55,
+      "vegan": false,
+      "allergens": [
+        "dairy",
+        "gluten"
+      ],
+      "description": "Chicken, peppers and onions roasted together with smoky fajita spice and served in tortillas.",
+      "source_url": "https://www.budgetbytes.com/oven-fajitas/"
+    },
+    {
+      "id": "4",
+      "title_hint": "Butter Chicken",
+      "cuisine": "indian",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 35,
+      "vegan": false,
+      "allergens": [
+        "dairy"
+      ],
+      "description": "Chicken simmered in a mild, creamy spiced tomato sauce (murgh makhani).",
+      "source_url": "https://www.recipetineats.com/butter-chicken/"
+    },
+    {
+      "id": "5",
+      "title_hint": "Kung Pao Chicken",
+      "cuisine": "chinese",
+      "meal_type": "dinner",
+      "protein_grams": 29,
+      "calories": 440,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 40,
+      "vegan": false,
+      "allergens": [
+        "peanuts",
+        "soy"
+      ],
+      "description": "Sichuan stir-fry of diced chicken, peanuts and dried chilies in a tangy-savory sauce.",
+      "source_url": "https://thewoksoflife.com/kung-pao-chicken/"
+    },
+    {
+      "id": "6",
+      "title_hint": "Pad Thai",
+      "cuisine": "thai",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": 650,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 30,
+      "vegan": false,
+      "allergens": [
+        "peanuts",
+        "eggs",
+        "fish",
+        "shellfish",
+        "soy"
+      ],
+      "description": "Rice-noodle stir-fry with tamarind sauce, egg, tofu, bean sprouts and crushed peanuts.",
+      "source_url": "https://www.recipetineats.com/chicken-pad-thai/"
+    },
+    {
+      "id": "7",
+      "title_hint": "Bulgogi (Korean BBQ Beef)",
+      "cuisine": "korean",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": null,
+      "vegan": false,
+      "allergens": [
+        "soy",
+        "sesame"
+      ],
+      "description": "Thin slices of beef marinated in a sweet-savory soy sauce base, then quickly seared.",
+      "source_url": "https://www.koreanbapsang.com/bulgogi-korean-bbq-beef/"
+    },
+    {
+      "id": "8",
+      "title_hint": "Chewy Chocolate Chip Cookies",
+      "cuisine": "american",
+      "meal_type": "dessert",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": null,
+      "vegan": false,
+      "allergens": [
+        "gluten",
+        "dairy",
+        "eggs"
+      ],
+      "description": "Thick, chewy cookies using melted butter, cornstarch and an extra egg yolk.",
+      "source_url": "https://sallysbakingaddiction.com/chewy-chocolate-chip-cookies/"
+    },
+    {
+      "id": "9",
+      "title_hint": "Fluffy Pancakes",
+      "cuisine": "american",
+      "meal_type": "breakfast",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 20,
+      "vegan": false,
+      "allergens": [
+        "gluten",
+        "dairy",
+        "eggs"
+      ],
+      "description": "A simple no-fail batter for soft, tall stovetop pancakes.",
+      "source_url": "https://www.recipetineats.com/pancake-recipe/"
+    },
+    {
+      "id": "10",
+      "title_hint": "Best Hummus",
+      "cuisine": "mediterranean",
+      "meal_type": "snack",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 15,
+      "vegan": true,
+      "allergens": [
+        "sesame"
+      ],
+      "description": "Ultra-smooth blended chickpea and tahini dip finished with olive oil.",
+      "source_url": "https://cookieandkate.com/best-hummus-recipe/"
+    },
+    {
+      "id": "11",
+      "title_hint": "Thai Green Curry",
+      "cuisine": "thai",
+      "meal_type": "dinner",
+      "protein_grams": 7,
+      "calories": 352,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 35,
+      "vegan": false,
+      "allergens": [
+        "fish"
+      ],
+      "description": "A coconut-milk curry built by frying green curry paste with vegetables and chicken.",
+      "source_url": "https://www.recipetineats.com/thai-green-curry/"
+    },
+    {
+      "id": "12",
+      "title_hint": "Best Guacamole",
+      "cuisine": "mexican",
+      "meal_type": "snack",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 15,
+      "vegan": true,
+      "allergens": [],
+      "description": "Fresh avocado dip with onion, cilantro, jalapeño, lime and a touch of ground coriander.",
+      "source_url": "https://cookieandkate.com/best-guacamole-recipe/"
+    },
+    {
+      "id": "13",
+      "title_hint": "Classic Chili",
+      "cuisine": "american",
+      "meal_type": "dinner",
+      "protein_grams": 23,
+      "calories": 398,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": null,
+      "vegan": false,
+      "allergens": [],
+      "description": "Ground beef and two-bean chili in a spiced tomato base.",
+      "source_url": "https://www.budgetbytes.com/basic-chili/"
+    },
+    {
+      "id": "14",
+      "title_hint": "Teriyaki Chicken",
+      "cuisine": "japanese",
+      "meal_type": "dinner",
+      "protein_grams": 32,
+      "calories": 449,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 15,
+      "vegan": false,
+      "allergens": [
+        "soy",
+        "gluten"
+      ],
+      "description": "Pan-cooked chicken glazed in a simple homemade soy-mirin-sake teriyaki sauce.",
+      "source_url": "https://japan.recipetineats.com/teriyaki-chicken/"
+    },
+    {
+      "id": "15",
+      "title_hint": "Vegan Overnight Oats",
+      "cuisine": "american",
+      "meal_type": "breakfast",
+      "protein_grams": 16,
+      "calories": 264,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 485,
+      "vegan": true,
+      "allergens": [
+        "peanuts",
+        "tree nuts"
+      ],
+      "description": "Vegan overnight oats with dairy-free milk, peanut butter, chia, maple syrup, fruit, and optional protein powder.",
+      "source_url": "https://www.eatingbirdfood.com/vegan-overnight-oats/"
+    },
+    {
+      "id": "16",
+      "title_hint": "Garlic Butter Salmon",
+      "cuisine": "western",
+      "meal_type": "dinner",
+      "protein_grams": 36,
+      "calories": 464,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 13,
+      "vegan": false,
+      "allergens": [
+        "fish",
+        "dairy"
+      ],
+      "description": "Salmon fillets seared and continuously basted in garlic butter.",
+      "source_url": "https://www.recipetineats.com/garlic-butter-salmon-recipe/"
+    },
+    {
+      "id": "17",
+      "title_hint": "Quick Chana Masala",
+      "cuisine": "indian",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 35,
+      "vegan": true,
+      "allergens": [],
+      "description": "Chickpeas simmered in a spiced tomato sauce, served over basmati rice.",
+      "source_url": "https://cookieandkate.com/quick-vegan-chana-masala/"
+    },
+    {
+      "id": "18",
+      "title_hint": "Vietnamese Pho",
+      "cuisine": "vietnamese",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 200,
+      "vegan": false,
+      "allergens": [
+        "fish"
+      ],
+      "description": "Beef noodle soup with a long-simmered, spice-infused clear broth and fresh toppings.",
+      "source_url": "https://www.recipetineats.com/vietnamese-pho-recipe/"
+    },
+    {
+      "id": "19",
+      "title_hint": "French Onion Soup",
+      "cuisine": "french",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": 386,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 110,
+      "vegan": false,
+      "allergens": [
+        "dairy",
+        "gluten"
+      ],
+      "description": "Deeply caramelized-onion soup topped with cheesy toasted bread.",
+      "source_url": "https://www.recipetineats.com/french-onion-soup/"
+    },
+    {
+      "id": "20",
+      "title_hint": "Seriously Fudgy Brownies",
+      "cuisine": "american",
+      "meal_type": "dessert",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": null,
+      "vegan": false,
+      "allergens": [
+        "gluten",
+        "dairy",
+        "eggs"
+      ],
+      "description": "Dense, rich brownies with a triple hit of cocoa, melted chocolate and chocolate chips.",
+      "source_url": "https://sallysbakingaddiction.com/seriously-fudgy-homemade-brownies/"
+    },
+    {
+      "id": "21",
+      "title_hint": "Baked Mac and Cheese",
+      "cuisine": "american",
+      "meal_type": "dinner",
+      "protein_grams": 23,
+      "calories": 551,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 70,
+      "vegan": false,
+      "allergens": [
+        "dairy",
+        "gluten"
+      ],
+      "description": "Creamy roux-based macaroni cheese with a crunchy panko-butter topping.",
+      "source_url": "https://www.recipetineats.com/baked-mac-and-cheese/"
+    },
+    {
+      "id": "22",
+      "title_hint": "Pork Carnitas",
+      "cuisine": "mexican",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": 578,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 375,
+      "vegan": false,
+      "allergens": [],
+      "description": "Slow-cooked pulled pork crisped in a pan, seasoned with orange, cumin and oregano.",
+      "source_url": "https://www.recipetineats.com/pork-carnitas-mexican-slow-cooker-pulled-pork/"
+    },
+    {
+      "id": "23",
+      "title_hint": "Best Ratatouille",
+      "cuisine": "french",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 60,
+      "vegan": true,
+      "allergens": [],
+      "description": "Roasted summer vegetables simmered into a rustic tomato stew.",
+      "source_url": "https://cookieandkate.com/best-ratatouille-recipe/"
+    },
+    {
+      "id": "24",
+      "title_hint": "Greek Salad (Horiatiki)",
+      "cuisine": "greek",
+      "meal_type": "lunch",
+      "protein_grams": 0.7,
+      "calories": 103,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": null,
+      "vegan": false,
+      "allergens": [
+        "dairy"
+      ],
+      "description": "A chunky, lettuce-free salad of tomato, cucumber, pepper, olives and feta with oregano.",
+      "source_url": "https://www.themediterraneandish.com/traditional-greek-salad-recipe/"
+    },
+    {
+      "id": "25",
+      "title_hint": "Classic Minestrone Soup",
+      "cuisine": "italian",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 65,
+      "vegan": false,
+      "allergens": [
+        "gluten",
+        "dairy"
+      ],
+      "description": "A hearty vegetable, bean and pasta soup in a tomato broth.",
+      "source_url": "https://cookieandkate.com/classic-minestrone-soup-recipe/"
+    },
+    {
+      "id": "26",
+      "title_hint": "One Pot Mexican Chicken and Rice",
+      "cuisine": "mexican",
+      "meal_type": "dinner",
+      "protein_grams": 41,
+      "calories": 702,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 70,
+      "vegan": false,
+      "allergens": [],
+      "description": "Fajita-spiced chicken baked over Mexican red rice with peppers, corn, black beans, and lime.",
+      "source_url": "https://www.recipetineats.com/one-pot-mexican-chicken-rice/"
+    },
+    {
+      "id": "27",
+      "title_hint": "Jambalaya",
+      "cuisine": "cajun",
+      "meal_type": "dinner",
+      "protein_grams": 39,
+      "calories": 707,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 70,
+      "vegan": false,
+      "allergens": [
+        "shellfish"
+      ],
+      "description": "Creole-style baked rice with chicken, smoked sausage, bacon, shrimp, vegetables, and Cajun spices.",
+      "source_url": "https://www.recipetineats.com/jambalaya-recipe/"
+    },
+    {
+      "id": "28",
+      "title_hint": "Vegetarian Enchiladas",
+      "cuisine": "mexican-inspired",
+      "meal_type": "dinner",
+      "protein_grams": 23,
+      "calories": 430,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 40,
+      "vegan": false,
+      "allergens": [
+        "dairy",
+        "gluten"
+      ],
+      "description": "Whole-wheat tortillas filled with beans, lentils, vegetables, and tomato sauce, then topped with yogurt and cheese.",
+      "source_url": "https://www.bbcgoodfood.com/recipes/bean-enchiladas"
+    },
+    {
+      "id": "29",
+      "title_hint": "Green Ginger Rice Noodles",
+      "cuisine": "asian",
+      "meal_type": "dinner",
+      "protein_grams": 36,
+      "calories": 580,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 25,
+      "vegan": false,
+      "allergens": [
+        "soy"
+      ],
+      "description": "Rice noodles and shredded chicken tossed in a vivid green onion, ginger, garlic, soy, and rice-vinegar sauce.",
+      "source_url": "https://www.recipetineats.com/green-ginger-rice-noodles/"
+    },
+    {
+      "id": "30",
+      "title_hint": "Chicken Satay Curry",
+      "cuisine": "thai-inspired",
+      "meal_type": "dinner",
+      "protein_grams": 26,
+      "calories": 480,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 40,
+      "vegan": false,
+      "allergens": [
+        "gluten",
+        "peanuts",
+        "soy"
+      ],
+      "description": "A creamy coconut and peanut chicken curry with green beans, peppers, and a savoury satay-style sauce.",
+      "source_url": "https://www.bbcgoodfood.com/recipes/chicken-satay-curry"
+    },
+    {
+      "id": "31",
+      "title_hint": "Salmon Risotto",
+      "cuisine": "italian",
+      "meal_type": "dinner",
+      "protein_grams": 40,
+      "calories": 806,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 75,
+      "vegan": false,
+      "allergens": [
+        "dairy",
+        "fish"
+      ],
+      "description": "A creamy lemon and Parmesan risotto finished with peas and tender poached salmon.",
+      "source_url": "https://www.bbcgoodfood.com/recipes/salmon-risotto"
+    },
+    {
+      "id": "32",
+      "title_hint": "Coconut Curried Kale and Sweet Potato",
+      "cuisine": "indian",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 65,
+      "vegan": true,
+      "allergens": [],
+      "description": "A hearty vegan curry of sweet potato, kale, coconut milk, ginger, warm spices, lime, and brown basmati rice.",
+      "source_url": "https://cookieandkate.com/coconut-curried-kale-and-sweet-potato-recipe/"
+    },
+    {
+      "id": "33",
+      "title_hint": "Lamb Tagine",
+      "cuisine": "moroccan",
+      "meal_type": "dinner",
+      "protein_grams": 65,
+      "calories": 684,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 135,
+      "vegan": false,
+      "allergens": [
+        "tree nuts"
+      ],
+      "description": "Fork-tender lamb shoulder slow-cooked with ras el hanout, apricots, lemon, and toasted almonds.",
+      "source_url": "https://www.recipetineats.com/lamb-tagine/"
+    },
+    {
+      "id": "34",
+      "title_hint": "Falafel",
+      "cuisine": "middle eastern",
+      "meal_type": "lunch",
+      "protein_grams": 8,
+      "calories": 48,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 55,
+      "vegan": true,
+      "allergens": [],
+      "description": "Naturally vegan falafel made with soaked chickpeas, parsley, cilantro, onion, garlic, green chile, and warm spices.",
+      "source_url": "https://downshiftology.com/recipes/falafel/"
+    },
+    {
+      "id": "35",
+      "title_hint": "Baked Cod with Lemon and Garlic",
+      "cuisine": "greek",
+      "meal_type": "dinner",
+      "protein_grams": 25.8,
+      "calories": 319.3,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 22,
+      "vegan": false,
+      "allergens": [
+        "dairy",
+        "fish",
+        "gluten"
+      ],
+      "description": "Flaky cod coated with coriander, paprika, and cumin, then baked in a bright lemon, garlic, and olive-oil sauce.",
+      "source_url": "https://www.themediterraneandish.com/baked-cod-recipe-lemon-garlic/"
+    },
+    {
+      "id": "36",
+      "title_hint": "Vegetarian Breakfast Burritos",
+      "cuisine": "mexican",
+      "meal_type": "breakfast",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 45,
+      "vegan": false,
+      "allergens": [
+        "dairy",
+        "eggs",
+        "gluten"
+      ],
+      "description": "Whole-grain tortillas filled with eggs, beans, hash browns, cheddar, cilantro, green onion, and salsa.",
+      "source_url": "https://cookieandkate.com/2018/vegetarian-breakfast-burritos-recipe/"
+    },
+    {
+      "id": "37",
+      "title_hint": "Harissa Fish with Bulgur Salad",
+      "cuisine": "north african-inspired",
+      "meal_type": "dinner",
+      "protein_grams": 35,
+      "calories": 430,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": null,
+      "vegan": false,
+      "allergens": [
+        "fish",
+        "gluten"
+      ],
+      "description": "Harissa-coated white fish served with a lemony bulgur salad containing vegetables and olives.",
+      "source_url": "https://www.bbcgoodfood.com/recipes/harissa-fish-with-bulgur-salad"
+    },
+    {
+      "id": "38",
+      "title_hint": "Slow Cooker Mexican Chicken Soup",
+      "cuisine": "mexican",
+      "meal_type": "dinner",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 495,
+      "vegan": false,
+      "allergens": [],
+      "description": "A slow-cooked Mexican chicken soup with beans, corn, tomatoes, chipotle, lime, and shredded chicken.",
+      "source_url": "https://www.recipetineats.com/slow-cooker-mexican-chicken-soup/"
+    },
+    {
+      "id": "39",
+      "title_hint": "Spicy Tuna Guacamole Bowls",
+      "cuisine": "japanese-mexican fusion",
+      "meal_type": "lunch",
+      "protein_grams": 22.95,
+      "calories": 395.43,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 15,
+      "vegan": false,
+      "allergens": [
+        "fish",
+        "sesame",
+        "soy"
+      ],
+      "description": "Rice bowls layered with tuna, edamame, cucumber, carrot, guacamole, cilantro, and sriracha.",
+      "source_url": "https://www.budgetbytes.com/spicy-tuna-guacamole-bowls/"
+    },
+    {
+      "id": "40",
+      "title_hint": "Chicken and Lime Soup",
+      "cuisine": "mexican-inspired",
+      "meal_type": "lunch",
+      "protein_grams": 15.9,
+      "calories": 202.58,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 70,
+      "vegan": false,
+      "allergens": [],
+      "description": "A bright and tangy chicken soup with tomatoes, jalapeño, cilantro, vegetables, and fresh lime.",
+      "source_url": "https://www.budgetbytes.com/chicken-lime-soup/"
+    },
+    {
+      "id": "41",
+      "title_hint": "Curried Chickpeas with Spinach",
+      "cuisine": "indian-inspired",
+      "meal_type": "dinner",
+      "protein_grams": 15,
+      "calories": 322,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 25,
+      "vegan": true,
+      "allergens": [],
+      "description": "Chickpeas and spinach cooked in a quick tomato curry with ginger, garlic, onion, and spices.",
+      "source_url": "https://www.budgetbytes.com/curried-chickpeas-spinach/"
+    },
+    {
+      "id": "42",
+      "title_hint": "Moroccan Lentil and Vegetable Soup",
+      "cuisine": "moroccan-inspired",
+      "meal_type": "dinner",
+      "protein_grams": 12.2,
+      "calories": 238.79,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 50,
+      "vegan": true,
+      "allergens": [],
+      "description": "A vegetable-rich lentil and chickpea soup seasoned with cumin, turmeric, cinnamon, and cayenne.",
+      "source_url": "https://www.budgetbytes.com/moroccan-lentil-vegetable-stew/"
+    },
+    {
+      "id": "43",
+      "title_hint": "Winter Vegetable Soup",
+      "cuisine": "chinese-inspired",
+      "meal_type": "lunch",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 75,
+      "vegan": true,
+      "allergens": [],
+      "description": "A nourishing vegan soup with winter vegetables, yellow split peas, tomato, herbs, and vegetable stock.",
+      "source_url": "https://thewoksoflife.com/winter-vegetable-soup/"
+    },
+    {
+      "id": "44",
+      "title_hint": "Chicken Enchiladas",
+      "cuisine": "mexican",
+      "meal_type": "dinner",
+      "protein_grams": 35,
+      "calories": 471,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 65,
+      "vegan": false,
+      "allergens": [
+        "dairy",
+        "gluten"
+      ],
+      "description": "Juicy seasoned chicken and beans rolled in tortillas, covered with homemade enchilada sauce and melted cheese.",
+      "source_url": "https://www.recipetineats.com/chicken-enchiladas/"
+    },
+    {
+      "id": "45",
+      "title_hint": "Farro Salad with Kale, Pomegranate and Almonds",
+      "cuisine": "mediterranean",
+      "meal_type": "lunch",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 50,
+      "vegan": true,
+      "allergens": [
+        "gluten",
+        "tree nuts"
+      ],
+      "description": "A festive vegan farro salad with kale, parsley, pomegranate, toasted almonds, lemon, allspice, and cinnamon.",
+      "source_url": "https://www.feastingathome.com/farro-kale-salad-with-pomegranate-and-almonds/"
+    },
+    {
+      "id": "46",
+      "title_hint": "Whole Wheat Blueberry Pancakes",
+      "cuisine": "american",
+      "meal_type": "breakfast",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 45,
+      "vegan": false,
+      "allergens": [
+        "dairy",
+        "eggs",
+        "gluten"
+      ],
+      "description": "Fluffy whole-wheat pancakes packed with blueberries, Greek yogurt, milk, maple syrup, and cinnamon.",
+      "source_url": "https://sallysbakingaddiction.com/whole-wheat-blueberry-pancakes/"
+    },
+    {
+      "id": "47",
+      "title_hint": "Pumpkin Protein Bars",
+      "cuisine": "american",
+      "meal_type": "snack",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 30,
+      "vegan": true,
+      "allergens": [
+        "gluten"
+      ],
+      "description": "Vegan pumpkin protein bars with oats, plant protein powder, pumpkin, maple syrup, spices, and dairy-free chocolate.",
+      "source_url": "https://www.eatingbirdfood.com/pumpkin-protein-bars-vegan-gluten-free/"
+    },
+    {
+      "id": "48",
+      "title_hint": "Breakfast Egg Muffins",
+      "cuisine": "american",
+      "meal_type": "breakfast",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 40,
+      "vegan": false,
+      "allergens": [
+        "dairy",
+        "eggs"
+      ],
+      "description": "Meal-prep egg muffins with three savory combinations of vegetables, cheese, bacon, or sausage.",
+      "source_url": "https://downshiftology.com/recipes/egg-muffins/"
+    },
+    {
+      "id": "49",
+      "title_hint": "No-Bake Chocolate Fudge Oat Bars",
+      "cuisine": "american",
+      "meal_type": "dessert",
+      "protein_grams": null,
+      "calories": null,
+      "carbs_grams": null,
+      "fat_grams": null,
+      "time_minutes": 135,
+      "vegan": false,
+      "allergens": [
+        "peanuts",
+        "tree nuts"
+      ],
+      "description": "Chewy no-bake oat bars with chocolate, peanut butter, maple syrup, crisp rice cereal, nuts, and raisins.",
+      "source_url": "https://sallysbakingaddiction.com/chocolate-fudge-oat-bars/"
+    }
+  ]
+}

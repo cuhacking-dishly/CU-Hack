@@ -12,7 +12,8 @@ const {
 test.beforeEach(clearStore);
 test.afterEach(clearStore);
 
-test("memory store saves, replaces, and isolates goals by user", () => {
+test("memory store saves, replaces, isolates, and uniquely versions goals by user", (t) => {
+  t.mock.method(Date, "now", () => 1_752_758_400_000);
   setGoal("user-a", "high protein", { minProtein_g: 30 });
   setGoal("user-b", "vegan", { diet: "vegan" });
 
@@ -22,9 +23,11 @@ test("memory store saves, replaces, and isolates goals by user", () => {
   assert.match(firstGoal.updatedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(getGoal("missing"), null);
 
+  const firstVersion = getGoal("user-a").updatedAt;
   setGoal("user-a", "quick", { maxReadyTime: 20 });
   assert.equal(getGoal("user-a").rawText, "quick");
   assert.deepEqual(getGoal("user-a").parsedFilter, { maxReadyTime: 20 });
+  assert.notEqual(getGoal("user-a").updatedAt, firstVersion);
   assert.equal(getGoal("user-b").rawText, "vegan");
 });
 
@@ -72,6 +75,14 @@ test("memory store records isolated swipe histories and clones returned entries"
     getSwipes("user-b").map(({ recipeId, direction }) => ({ recipeId, direction })),
     [{ recipeId: "202", direction: "left" }]
   );
+});
+
+test("memory store records an optional saved-goal version with each swipe", () => {
+  addSwipe("user-a", "101", "right", " 2026-07-17T12:00:00.000Z ");
+  addSwipe("user-a", "102", "left");
+
+  assert.equal(getSwipes("user-a")[0].goalUpdatedAt, "2026-07-17T12:00:00.000Z");
+  assert.equal(Object.hasOwn(getSwipes("user-a")[1], "goalUpdatedAt"), false);
 });
 
 test("memory store caps retained swipe history per user", () => {

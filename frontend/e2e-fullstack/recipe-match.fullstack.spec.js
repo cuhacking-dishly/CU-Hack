@@ -68,6 +68,7 @@ test("runs the complete browser flow through the real Express API", async ({ pag
   expect(browserApiCalls[2].searchParams).toEqual({ userId: USER_ID });
   expect(browserApiCalls[3].searchParams).toEqual({
     limit: "10",
+    matchMode: "exact",
     offset: "0",
     userId: USER_ID,
   });

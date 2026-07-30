@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "../router.jsx";
 import { describe, expect, it } from "vitest";
 import NotFoundPage from "./NotFoundPage.jsx";
 

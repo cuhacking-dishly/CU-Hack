@@ -34,7 +34,7 @@ export function applyMealType(parsedFilter, mealType) {
   return filter;
 }
 
-/** Writes a complete, category-labelled natural-language request for Gemini. */
+/** Writes a complete, category-labelled request for the local Ollama parser. */
 export function createNaturalLanguageGoalText({ goalText, cultureText, allergyText } = {}) {
   const craving = normalizeText(goalText);
   const culture = normalizeText(cultureText);

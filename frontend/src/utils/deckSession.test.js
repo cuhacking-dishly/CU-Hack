@@ -23,6 +23,12 @@ const SNAPSHOT = {
   currentIndex: 0,
   nextOffset: 10,
   hasMore: true,
+  match: {
+    mode: "exact",
+    canShowClosest: false,
+    message: null,
+    semanticProvider: "ollama",
+  },
 };
 
 describe("deck session storage", () => {
@@ -48,8 +54,47 @@ describe("deck session storage", () => {
     { ...SNAPSHOT, currentIndex: 2 },
     { ...SNAPSHOT, nextOffset: -1 },
     { ...SNAPSHOT, hasMore: "yes" },
+    { ...SNAPSHOT, match: null },
+    { ...SNAPSHOT, match: undefined },
+    { ...SNAPSHOT, match: { ...SNAPSHOT.match, mode: "unsafe" } },
   ])("rejects a malformed snapshot without throwing: %j", (snapshot) => {
     expect(writeDeckSession(USER_ID, GOAL_VERSION, snapshot)).toBe(false);
+  });
+
+  it("persists closest-match mode and safely upgrades a nonempty legacy snapshot", () => {
+    const closestSnapshot = {
+      ...SNAPSHOT,
+      match: {
+        mode: "closest",
+        canShowClosest: false,
+        message: "Showing nearby results.",
+        semanticProvider: "ollama",
+      },
+    };
+    expect(writeDeckSession(USER_ID, GOAL_VERSION, closestSnapshot)).toBe(true);
+    expect(readDeckSession(USER_ID, GOAL_VERSION)).toEqual(closestSnapshot);
+
+    const legacyGoalVersion = "2026-07-11T17:00:00.000Z";
+    const legacySnapshot = {
+      recipes: [RECIPE],
+      currentIndex: 0,
+      nextOffset: 10,
+      hasMore: false,
+    };
+    expect(writeDeckSession(USER_ID, legacyGoalVersion, legacySnapshot)).toBe(true);
+    expect(readDeckSession(USER_ID, legacyGoalVersion)).toMatchObject({
+      ...legacySnapshot,
+      match: { mode: "exact", canShowClosest: false },
+    });
+  });
+
+  it("rejects an empty legacy snapshot so the fallback capability is refetched", () => {
+    expect(writeDeckSession(USER_ID, GOAL_VERSION, {
+      recipes: [],
+      currentIndex: 0,
+      nextOffset: 10,
+      hasMore: false,
+    })).toBe(false);
   });
 
   it("removes corrupt JSON and safely returns no cache", () => {

@@ -6,6 +6,12 @@ const goalRoutes = require("./routes/goalRoutes");
 const recipeRoutes = require("./routes/recipeRoutes");
 const swipeRoutes = require("./routes/swipeRoutes");
 const { createHttpError } = require("./routes/routeUtils");
+const { checkRetrievalReadiness } = require("./services/retrievalService");
+const {
+  checkStoreReadiness,
+  closeStore,
+  initializeStore,
+} = require("./store");
 
 const app = express();
 
@@ -22,14 +28,25 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/ready", (_req, res) => {
-  const services = {
-    gemini: hasNonblankEnvironmentValue("GEMINI_API_KEY"),
-    spoonacular: hasNonblankEnvironmentValue("SPOONACULAR_API_KEY"),
-  };
-  const ok = services.gemini && services.spoonacular;
+app.get("/api/ready", async (_req, res, next) => {
+  let retrieval;
+  let storage;
+  try {
+    [retrieval, storage] = await Promise.all([
+      checkRetrievalReadiness(),
+      checkStoreReadiness(),
+    ]);
+  } catch (error) {
+    return next(error);
+  }
 
-  res.status(ok ? 200 : 503).json({ ok, services });
+  const services = {
+    retrieval,
+    storage,
+  };
+  const ok = Object.values(services).every(Boolean);
+
+  return res.status(ok ? 200 : 503).json({ ok, services });
 });
 
 app.use("/api", goalRoutes);
@@ -66,14 +83,34 @@ app.use((error, req, res, next) => {
   return res.status(statusCode).json({ error: publicMessage });
 });
 
-if (require.main === module) {
+async function startServer() {
   const port = parsePort(process.env.PORT);
-  app.listen(port, () => {
+  await initializeStore();
+  const server = app.listen(port, () => {
     console.log(`Backend listening on http://localhost:${port}`);
+  });
+  const shutdown = async () => {
+    server.close(async () => {
+      await closeStore();
+      process.exit(0);
+    });
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+  return server;
+}
+
+if (require.main === module) {
+  startServer().catch((error) => {
+    console.error("Backend startup failed", {
+      message: redactConfiguredSecrets(error?.message || String(error)),
+    });
+    process.exitCode = 1;
   });
 }
 
 module.exports = app;
+module.exports.startServer = startServer;
 
 function createCorsMiddleware() {
   const configuredOrigins = String(process.env.CORS_ORIGINS || "")
@@ -95,10 +132,6 @@ function createCorsMiddleware() {
       return callback(createHttpError(403, "Origin not allowed by CORS"));
     },
   });
-}
-
-function hasNonblankEnvironmentValue(name) {
-  return typeof process.env[name] === "string" && process.env[name].trim() !== "";
 }
 
 function normalizeError(error) {
@@ -124,7 +157,12 @@ function normalizeError(error) {
 
 function redactConfiguredSecrets(value) {
   let redacted = String(value);
-  for (const name of ["GEMINI_API_KEY", "SPOONACULAR_API_KEY"]) {
+  for (const name of [
+    "DATABASE_URL",
+    "RETRIEVAL_SERVICE_HOSTPORT",
+    "RETRIEVAL_SERVICE_TOKEN",
+    "RETRIEVAL_SERVICE_URL",
+  ]) {
     const secret = process.env[name];
     if (typeof secret === "string" && secret.trim() !== "") {
       const rawVariants = [secret, secret.trim()];

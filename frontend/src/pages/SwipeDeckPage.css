@@ -878,3 +878,78 @@
   .deck-header-actions { width: 100%; }
   .deck-header-actions .ui-btn { flex: 1 1 auto; }
 }
+
+/* Exact/closest retrieval states share the deck without obscuring the distinction. */
+.deck-match-notice {
+  width: min(100%, 1180px);
+  margin: -2px auto 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  border: 1px solid rgba(229, 196, 110, 0.38);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: rgba(248, 245, 237, 0.78);
+  background: rgba(229, 196, 110, 0.08);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  animation: page-rise-in 360ms ease both;
+}
+
+.deck-match-notice strong {
+  color: #fff2bc;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.deck-closest-mode .recipe-card {
+  border-color: rgba(229, 196, 110, 0.72);
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.46), 0 0 0 2px rgba(229, 196, 110, 0.15) inset;
+}
+
+.recipe-card-match-reasons {
+  border: 1px solid rgba(137, 103, 16, 0.24);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: rgba(229, 196, 110, 0.13);
+}
+
+.recipe-card-match-reasons h3 {
+  margin: 0 0 9px;
+  color: #6f530c;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+
+.recipe-card-match-reasons ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.15rem;
+  color: #465448;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.deck-state-panel > .deck-closest-error {
+  margin: -8px 0 20px;
+  color: #ffc8bd;
+  font-weight: 800;
+}
+
+@media (max-width: 700px) {
+  .deck-match-notice {
+    margin-top: 0;
+    align-items: flex-start;
+    padding: 10px 12px;
+  }
+
+  .deck-match-notice strong,
+  .deck-match-notice span {
+    flex-basis: 100%;
+  }
+}

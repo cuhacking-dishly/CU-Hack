@@ -48,7 +48,7 @@ export function createNutritionGoalText(targets) {
 }
 
 /**
- * Converts the optional landing-page nutrition targets into Spoonacular's
+ * Converts the optional landing-page nutrition targets into Dishly's
  * bounded range filters. A blank control intentionally leaves the parsed goal
  * untouched; a completed control asks for recipes within 20% of that target.
  */

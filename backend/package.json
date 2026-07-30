@@ -9,15 +9,17 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
+    "dev": "node --watch src/devServer.js",
+    "db:migrate": "node src/store/migrate.js",
     "test": "node --test",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=95 --test-coverage-functions=95 --test-coverage-branches=90",
+    "test:local": "node --test test/liveApi.test.js",
     "test:live": "node --test test/liveApi.test.js"
   },
   "dependencies": {
-    "@google/genai": "2.11.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "pg": "8.16.3"
   }
 }
