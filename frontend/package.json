@@ -17,6 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:fullstack": "playwright test --config playwright.fullstack.config.js",
+    "test:e2e:production": "playwright test --config playwright.production.config.js",
     "test:all": "npm run lint && npm run test:coverage && npm run build && npm run test:e2e"
   },
   "dependencies": {

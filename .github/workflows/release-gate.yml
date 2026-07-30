@@ -134,6 +134,9 @@ jobs:
       - name: Run Express and UI full-stack journey
         run: npm --prefix frontend run test:e2e:fullstack
 
+      - name: Run production-shaped same-origin journeys
+        run: npm --prefix frontend run test:e2e:production
+
       - name: Retain browser diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -14,7 +14,11 @@
     "test:fullstack": "npm --prefix frontend run test:e2e:fullstack",
     "test:local-rag": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local-rag.ps1",
     "test:deployment": "node --test scripts/verify-production.test.mjs",
-    "verify": "npm run test:python && npm run test:deployment && npm --prefix backend test && npm --prefix backend run test:coverage && npm --prefix frontend test && npm --prefix frontend run lint && npm --prefix frontend run test:coverage && npm --prefix frontend run build && npm --prefix frontend run test:e2e && npm run test:fullstack",
+    "production:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup.ps1",
+    "production:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-free-production.ps1",
+    "production:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-free-production.ps1",
+    "production:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/status-free-production.ps1",
+    "verify": "npm run test:python && npm run test:deployment && npm --prefix backend test && npm --prefix backend run test:coverage && npm --prefix frontend test && npm --prefix frontend run lint && npm --prefix frontend run test:coverage && npm --prefix frontend run build && npm --prefix frontend run test:e2e && npm run test:fullstack && npm --prefix frontend run test:e2e:production",
     "test:all": "npm run verify"
   },
   "devDependencies": {

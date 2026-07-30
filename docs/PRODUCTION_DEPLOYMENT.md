@@ -1,180 +1,242 @@
-# Production deployment
+# Zero-cost production deployment
 
-Dishly has three runtime boundaries and one datastore:
+Dishly's supported production deployment costs $0 and keeps the complete local
+RAG architecture:
 
 ```text
-browser
-  -> static React frontend
-  -> public Express API
-       -> PostgreSQL
-       -> private FastAPI retrieval service
-            -> co-located Ollama
-            -> reviewed corpus + digest-bound vector index
+public browser
+  -> Tailscale Funnel HTTPS (*.ts.net)
+       -> Express on 127.0.0.1:3000
+            |-> built React SPA
+            |-> durable local SQLite
+            `-> token-protected FastAPI on 127.0.0.1:8000
+                  -> Ollama on 127.0.0.1:11434
+                       |-> qwen3:4b-instruct
+                       `-> embeddinggemma
+                  -> reviewed corpus + digest-bound vector index
 ```
 
-The checked-in `render.yaml` is a complete Render Blueprint for that topology.
-The frontend can instead run on Vercel without changing the API or RAG services.
+There is no Render, Vercel, hosted database, hosted AI API, credit card, trial,
+or metered cloud resource in this topology. Tailscale Funnel is available on the
+free Personal plan. The tradeoff is physical: this Windows machine must stay
+powered on, connected to the internet, and awake.
 
-## Cost and capacity
+Ollama and FastAPI are never exposed directly. Funnel publishes only the
+loopback Express gateway. Express serves the frontend and API on the same origin,
+uses an exact CORS allowlist, applies a restrictive CSP and security headers, and
+shares a generated 256-bit bearer token with FastAPI.
 
-The 4B parser model, embedding model, Ollama runtime, Python service, and vector
-index do not fit on free/serverless compute. The Blueprint deliberately uses a
-paid private service with a persistent disk for retrieval and a persistent
-PostgreSQL plan. Render shows the current price before creating resources.
-Review and approve that price in the dashboard; never assume a free deployment.
+## Prerequisites
 
-If an 8 GB Raspberry Pi or another persistent host is already available, use the
-existing Pi deployment instead and host only the frontend/API in the cloud. Set
-`RETRIEVAL_SERVICE_URL` to an authenticated private tunnel or VPN address and set
-the same random token on both sides. Do not expose Ollama itself.
+- Windows 10/11 x64
+- Node.js 24+ and npm 11+
+- Ollama for Windows
+- Tailscale 1.38.3+ on a free Personal tailnet
+- about 5 GB free for models, dependencies, indexes, logs, and state
+- a machine power policy that does not sleep while hosting
 
-## Option A: one Render Blueprint
+Python does not need to be installed globally when `uv` is available. The setup
+script can install a project-local Python 3.12 runtime under `.runtime/`.
 
-1. Push the intended commit to a Git provider Render can access.
-2. In Render, create a **Blueprint** from the repository. Render detects
-   `render.yaml`.
-3. Review the paid retrieval and PostgreSQL resources, then create the Blueprint.
-4. The first retrieval boot downloads about 3 GB of models and builds the vector
-   index. The persistent disk makes subsequent boots much faster.
-5. Wait for:
-   - `dishly-retrieval` to pass Render's private-service TCP probe (its
-     authenticated diagnostics remain available to `dishly-api`);
-   - `dishly-api` health at `/api/ready`;
-   - `dishly-web` deployment completion.
-6. Run the production verifier:
+## One-time Tailscale authorization
+
+Open an elevated PowerShell and connect the device:
 
 ```powershell
-node scripts/verify-production.mjs `
-  --api https://YOUR-API.onrender.com/api `
-  --frontend https://YOUR-WEB.onrender.com `
-  --origin https://YOUR-WEB.onrender.com
+& "C:\Program Files\Tailscale\tailscale.exe" up `
+  --unattended `
+  --hostname=dishly
 ```
 
-The Blueprint wires these values without exposing them to the browser:
+Open the one-time URL it prints, sign in to the intended free Tailscale account,
+and authorize the device. Funnel requires MagicDNS and HTTPS; the first
+`production:start` run enables the narrowly scoped Funnel capability if the
+tailnet asks for it.
 
-- PostgreSQL `connectionString` -> `DATABASE_URL`
-- retrieval private `host:port` -> `RETRIEVAL_SERVICE_HOSTPORT`
-- generated `DISHLY_SERVICE_TOKEN` -> Express `RETRIEVAL_SERVICE_TOKEN`
-- frontend public URL -> `CORS_ORIGINS`
-- API public URL -> build-time `VITE_API_ORIGIN`
+This authorization is the only external account action. Review the OAuth and
+Funnel permission screens before accepting them. Neither action creates a paid
+resource.
 
-## Option B: Vercel frontend and Render API/RAG
+## First deployment
 
-Deploy the Render Blueprint first. It includes a Render static frontend because
-that makes the Blueprint independently deployable. A Vercel frontend can replace
-it afterward:
+Run from an elevated PowerShell in the repository root:
 
-1. Import the repository into Vercel.
-2. Set **Root Directory** to `frontend`.
-3. Use build command `npm run build` and output directory `dist`.
-4. Set `VITE_API_ORIGIN=https://YOUR-API.onrender.com`.
-5. Deploy. `frontend/vercel.json` provides SPA rewrites and response hardening.
-6. In the Render API service, replace `CORS_ORIGINS` with the exact Vercel
-   production origin. Add explicit preview origins only when a preview must call
-   production; do not use `*`.
-7. Redeploy the API and rerun the verifier with the Vercel URL.
+```powershell
+npm.cmd run production:start
+```
 
-`VITE_API_ORIGIN` is public by design. It contains only the Express origin and
-the frontend appends `/api`. Never create frontend variables for PostgreSQL,
-retrieval, Ollama, or service-token values.
+The command is transactional:
 
-## Runtime configuration
+1. installs exact lockfile dependencies;
+2. creates or repairs the local Python environment;
+3. starts Ollama and ensures both pinned models exist;
+4. validates all reviewed recipes and builds the vector index;
+5. builds the React production bundle with same-origin `/api`;
+6. creates a private 256-bit retrieval token under `.dishly/`;
+7. starts token-protected FastAPI on loopback;
+8. starts Express/React on loopback with required SQLite persistence;
+9. waits for dependency readiness;
+10. runs the real qwen3/embeddinggemma production verifier locally;
+11. starts Tailscale Funnel in background mode;
+12. runs the same verifier against the public HTTPS URL.
 
-### Express
+If any step fails, processes started by that attempt are stopped and no success
+record is written. The error and service logs remain available for diagnosis.
 
-| Variable | Production requirement |
+For a fast restart after dependencies/models are already installed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts/start-free-production.ps1 `
+  -SkipSetup
+```
+
+For a production-shaped local run that creates no public tunnel:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts/start-free-production.ps1 `
+  -LocalOnly
+```
+
+## Runtime files
+
+All generated production state is ignored by Git:
+
+| Path | Purpose |
 | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string. |
-| `REQUIRE_PERSISTENT_STORE` | `true`; readiness fails when the database is absent. |
-| `RETRIEVAL_SERVICE_HOSTPORT` | Private host and port when both services are on Render. |
-| `RETRIEVAL_SERVICE_URL` | Alternative absolute HTTP(S) URL for a Pi/VPS/tunnel. |
-| `RETRIEVAL_SERVICE_TOKEN` | Same 32+ character secret as Python. |
-| `CORS_ORIGINS` | Exact comma-separated browser origins. Never `*` in production. |
-| `RETRIEVAL_TIMEOUT_MS` | Search/readiness deadline. |
-| `GOAL_PARSER_TIMEOUT_MS` | Cold-model parsing deadline. |
+| `.dishly/state/dishly.sqlite` | Durable goals and swipe history. |
+| `.dishly/retrieval-token` | Private Express/FastAPI bearer token. |
+| `.dishly/logs/` | Separate stdout/stderr logs for both services. |
+| `.dishly/deployment.json` | Public URL, local ports, PIDs, and paths; no secret. |
+| `dishly-addon/data/embeddings.json` | Generated corpus/model-bound vector index. |
+| `.runtime/python/` | Optional uv-managed Python runtime. |
+| `.cache/uv/` | Project-local uv package cache. |
 
-`RETRIEVAL_SERVICE_URL` takes precedence over `RETRIEVAL_SERVICE_HOSTPORT`.
+SQLite uses WAL mode, a 5-second busy timeout, strict tables, atomic swipe
+retention, and a hard limit of the newest 1,000 swipes per user. A new goal gets
+a monotonically increasing version even if the system clock does not advance.
+PostgreSQL remains supported through `DATABASE_URL`, which takes precedence over
+SQLite, but it is not required by the zero-cost deployment.
 
-### Retrieval
+## Status, logs, and shutdown
 
-| Variable | Production requirement |
-| --- | --- |
-| `DISHLY_SERVICE_TOKEN` | Random 32+ character bearer token. |
-| `DISHLY_SERVICE_HOST` | `0.0.0.0` in a container; loopback on a co-located Pi. |
-| `DISHLY_SERVICE_PORT` | `8000` in the Blueprint. |
-| `OLLAMA_HOST` | Loopback URL for the co-located Ollama server. |
-| `OLLAMA_MODELS` | Persistent-disk model directory. |
-| `DISHLY_INDEX_PATH` | Persistent-disk vector-index path. |
-| `OLLAMA_MAX_LOADED_MODELS` | `2`, so the parser and embedding model can remain resident. |
-| `OLLAMA_NUM_PARALLEL` | `1`, bounding peak memory on the 8 GB retrieval instance. |
+```powershell
+npm.cmd run production:status
+Get-Content .dishly\logs\backend.stderr.log -Tail 100
+Get-Content .dishly\logs\retrieval.stderr.log -Tail 100
+npm.cmd run production:stop
+```
 
-`/health` remains unauthenticated for container diagnostics. `/ready`, `/docs`,
-and every `/v1/*` route require the bearer token whenever
-`DISHLY_SERVICE_TOKEN` is configured.
+`production:stop` removes the public Funnel and stops both app processes while
+preserving SQLite, the vector index, the token, and logs. Use
+`scripts/stop-free-production.ps1 -KeepFunnel` only during a short controlled
+restart; a Funnel with no healthy local gateway returns an upstream error.
 
-## Database behavior and migrations
+Tailscale Funnel status is independently visible with:
 
-`backend/src/store/migrations/001_initial.sql` creates:
+```powershell
+& "C:\Program Files\Tailscale\tailscale.exe" funnel status
+```
 
-- one current goal per user;
-- ordered swipe history with the associated goal version;
-- bounded retention of 1,000 swipes per user.
+## Acceptance checks
 
-Render runs `npm run db:migrate` before each API deploy. The migration is
-idempotent and additive. Local development continues to use the in-memory store
-when `DATABASE_URL` is absent.
+The machine verifier proves:
 
-## Acceptance and operational checks
-
-The production verifier proves:
-
-- liveness, retrieval readiness, and storage readiness;
+- public liveness and dependency readiness;
 - exact production CORS;
-- real qwen3 parsing and deterministic peanut recovery;
-- `ollama:embeddinggemma` vector retrieval;
-- publisher image/source provenance;
-- goal round-trip and swipe exclusion persistence;
-- detail lookup;
-- frontend SPA direct-route rewrites;
-- absence of private configuration markers in browser bundles.
+- a real qwen3 goal parse plus deterministic peanut-safety recovery;
+- `ollama:embeddinggemma` vector retrieval from the generated index;
+- reviewed publisher recipe provenance;
+- durable goal round-trip and swipe exclusion;
+- detail lookup and SPA direct routes;
+- absence of database, retrieval URL, and token markers in browser bundles.
 
-Also inspect the browser manually at desktop and mobile widths and run the
-repository verification matrix before deploying:
+Run it again at any time:
+
+```powershell
+$deployment = Get-Content .dishly\deployment.json | ConvertFrom-Json
+node scripts/verify-production.mjs `
+  --api $deployment.api `
+  --frontend $deployment.origin `
+  --origin $deployment.origin
+```
+
+The deterministic release gate adds Python/backend/frontend coverage, lint,
+OpenAPI/deployment schema checks, the exact Linux container build, mocked browser
+journeys, real Express full-stack behavior, and production-shaped same-origin
+journeys at desktop and mobile widths:
 
 ```powershell
 npm.cmd run verify
 npm.cmd run test:local-rag
 ```
 
-The checked-in GitHub Actions release gate repeats the deterministic matrix on
-Ubuntu and additionally builds and smoke-tests the exact retrieval Docker image.
-Do not deploy a commit whose **Release gate** workflow is not green.
+## Backup and restore
+
+Stop Dishly before copying SQLite so the database and WAL are a consistent set:
+
+```powershell
+npm.cmd run production:stop
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+New-Item -ItemType Directory -Force ".dishly\backups\$stamp" | Out-Null
+Copy-Item ".dishly\state\dishly.sqlite*" ".dishly\backups\$stamp\"
+```
+
+Restore only while Dishly is stopped:
+
+```powershell
+Copy-Item ".dishly\backups\BACKUP-STAMP\dishly.sqlite*" `
+  ".dishly\state\" `
+  -Force
+npm.cmd run production:start
+```
+
+The retrieval token is not data and can be regenerated by deleting it while the
+services are stopped. Never commit `.dishly/`.
+
+## Upgrade and rollback
+
+Before an upgrade, record the currently deployed commit and take a SQLite backup.
+Then stop, update the repository, and run the complete start command so lockfiles,
+the Python package, corpus, index, and frontend are rebuilt together.
+
+To roll back:
+
+1. stop production;
+2. restore the previously deployed Git commit in a clean worktree;
+3. restore the matching SQLite backup only if a future migration requires it;
+4. run `npm.cmd run production:start`;
+5. rerun the public verifier and browser smoke.
+
+The current SQLite schema is additive and created idempotently. The existing
+PostgreSQL migration remains backward-compatible.
 
 ## Troubleshooting
 
-- **API readiness says retrieval false:** inspect the retrieval logs for model
-  pull, index compatibility, disk capacity, or an incorrect token/hostport.
-- **API readiness says storage false:** verify `DATABASE_URL`, run
-  `npm run db:migrate`, and check PostgreSQL connectivity.
-- **Browser reports CORS:** compare the browser's exact origin—including scheme
-  and preview hostname—with `CORS_ORIGINS`, then redeploy Express.
-- **First deployment times out:** model download/index setup can exceed ordinary
-  web cold starts. Retrieval needs persistent always-on compute.
-- **Parser times out after readiness succeeds:** increase both Python
-  `OLLAMA_PARSER_TIMEOUT_SECONDS` and Express `GOAL_PARSER_TIMEOUT_MS`; keep the
-  frontend parse deadline slightly larger than Express.
-- **Render container restarts while loading qwen3:** the selected instance lacks
-  memory. Move to an instance with more RAM; do not remove the parser or silently
-  fall back to generated recipes.
+- **Tailscale reports `NeedsLogin`:** rerun the elevated `tailscale up` command
+  and finish its one-time browser authorization.
+- **Tailscale CLI says access denied:** run production commands from an elevated
+  PowerShell. Do not weaken filesystem or service ACLs.
+- **Funnel asks to enable access:** approve only the Funnel capability for this
+  tailnet; Dishly never needs an exit node, subnet routes, SSH, or public Ollama.
+- **Retrieval readiness is false:** inspect retrieval stderr, confirm Ollama is
+  listening on `127.0.0.1:11434`, then run
+  `dishly-addon\.venv\Scripts\python.exe -m dishly_retrieval status`.
+- **Storage readiness is false:** confirm `.dishly/state/` is writable and no
+  other program has locked/deleted the SQLite files.
+- **Public URL is offline after sleep/reboot:** disable sleep while plugged in
+  and rerun `production:start`. Tailscale's Funnel mapping persists, but the
+  Dishly processes must be running.
+- **Parser is slow on first request:** qwen3 may be cold. The configured Python,
+  Express, and browser deadlines deliberately allow up to several minutes.
+- **Port 3000 or 8000 is occupied:** stop the conflicting process or use
+  `-Port`/`-RetrievalPort`; the status file records non-default values.
 
-## Rollback
+## Paid provider files
 
-1. Use Render's service rollback for `dishly-api`, `dishly-web`, and
-   `dishly-retrieval`.
-2. The initial database migration is backward-compatible with the previous
-   memory implementation and does not delete data.
-3. Before any future destructive migration, take a PostgreSQL backup and ship a
-   tested down migration.
-4. If rolling the frontend back independently, preserve the deployed API origin
-   and CORS allowlist.
-5. After rollback, rerun `scripts/verify-production.mjs` against the live URLs.
+`render.yaml`, `frontend/vercel.json`, and the portable retrieval Dockerfile are
+retained for portability and CI validation. The Render Blueprint explicitly
+contains paid resources and is not part of the supported zero-cost deployment.
+Do not create it unless the owner later gives separate, explicit billing
+authorization.

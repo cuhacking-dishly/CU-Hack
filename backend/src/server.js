@@ -1,3 +1,5 @@
+const fs = require("node:fs");
+const path = require("node:path");
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
@@ -17,6 +19,31 @@ const app = express();
 
 app.disable("x-powered-by");
 app.set("json escape", true);
+app.use((_req, res, next) => {
+  res.set({
+    "Content-Security-Policy": [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "connect-src 'self'",
+      "font-src 'self' data:",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+      "img-src 'self' data: https:",
+      "object-src 'none'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+    ].join("; "),
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+  });
+  if (process.env.NODE_ENV === "production") {
+    res.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  next();
+});
 app.use("/api", (_req, res, next) => {
   res.set("Cache-Control", "no-store");
   next();
@@ -53,6 +80,27 @@ app.use("/api", goalRoutes);
 app.use("/api", recipeRoutes);
 app.use("/api", swipeRoutes);
 
+const frontend = resolveFrontendDistribution();
+if (frontend) {
+  app.use(express.static(frontend.directory, {
+    etag: true,
+    index: false,
+    setHeaders(res, filePath) {
+      const relativePath = path.relative(frontend.directory, filePath);
+      if (relativePath.split(path.sep)[0] === "assets") {
+        res.set("Cache-Control", "public, max-age=31536000, immutable");
+      } else {
+        res.set("Cache-Control", "public, max-age=3600");
+      }
+    },
+  }));
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api/") || path.extname(req.path)) return next();
+    res.set("Cache-Control", "no-cache");
+    return res.sendFile(frontend.indexPath);
+  });
+}
+
 app.use((_req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
@@ -85,9 +133,10 @@ app.use((error, req, res, next) => {
 
 async function startServer() {
   const port = parsePort(process.env.PORT);
+  const host = parseHost(process.env.HOST);
   await initializeStore();
-  const server = app.listen(port, () => {
-    console.log(`Backend listening on http://localhost:${port}`);
+  const server = app.listen(port, host, () => {
+    console.log(`Backend listening on http://${host}:${port}`);
   });
   const shutdown = async () => {
     server.close(async () => {
@@ -197,4 +246,29 @@ function parsePort(value) {
   }
 
   return port;
+}
+
+function parseHost(value) {
+  const normalized = value === undefined || value === "" ? "0.0.0.0" : String(value).trim();
+  if (
+    normalized === ""
+    || normalized.length > 253
+    || /[\s/?#\\]/.test(normalized)
+  ) {
+    throw new Error("HOST must be a valid hostname or IP address");
+  }
+  return normalized;
+}
+
+function resolveFrontendDistribution(value = process.env.FRONTEND_DIST_PATH) {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const directory = path.resolve(value.trim());
+  const indexPath = path.join(directory, "index.html");
+  if (!fs.statSync(directory, { throwIfNoEntry: false })?.isDirectory()) {
+    throw new Error(`FRONTEND_DIST_PATH is not a directory: ${directory}`);
+  }
+  if (!fs.statSync(indexPath, { throwIfNoEntry: false })?.isFile()) {
+    throw new Error(`FRONTEND_DIST_PATH does not contain index.html: ${directory}`);
+  }
+  return { directory, indexPath };
 }

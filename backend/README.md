@@ -29,7 +29,10 @@ Configuration:
 | `RETRIEVAL_TIMEOUT_MS` | `8000` | Search/detail/readiness deadline, bounded to `100..120000`. |
 | `GOAL_PARSER_TIMEOUT_MS` | `180000` | Cold local-language-model deadline, bounded to `1000..600000`. |
 | `DATABASE_URL` | unset | Enables persistent PostgreSQL goals and swipes. |
-| `REQUIRE_PERSISTENT_STORE` | `false` | When true, `/ready` fails if PostgreSQL is not configured/reachable. |
+| `SQLITE_DATABASE_PATH` | unset | Enables durable local SQLite goals and swipes when PostgreSQL is absent. |
+| `FRONTEND_DIST_PATH` | unset | Serves a built React SPA and direct-route fallback from this directory. |
+| `HOST` | `0.0.0.0` | Listen address; zero-cost production sets `127.0.0.1` behind Funnel. |
+| `REQUIRE_PERSISTENT_STORE` | `false` | When true, `/ready` fails unless PostgreSQL or SQLite is configured and reachable. |
 
 The browser must never call `RETRIEVAL_SERVICE_URL` directly. In a Pi deployment,
 bind Python to loopback and expose only Nginx/Express. Cross-host deployments
@@ -42,7 +45,7 @@ must configure the same random token on Express and Python.
    explicit constraints from the original text.
 3. Express validates the returned filter again with `normalizeGoalFilter`.
 4. `POST /api/goal` saves the filter and a monotonic goal version in the selected
-   memory or PostgreSQL repository.
+   memory, SQLite, or PostgreSQL repository.
 5. `GET /api/recipes` sends the saved goal plus same-goal swipe exclusions to
    local hybrid retrieval.
 6. Express validates recipe IDs, URLs, publisher fields, nutrition, match metadata,
@@ -117,7 +120,8 @@ npm.cmd --prefix backend run test:coverage
 ```
 
 The normal suite is deterministic and mocks the private HTTP boundary. It also
-tests the PostgreSQL repository with a deterministic pool boundary. The live
+tests PostgreSQL through a deterministic pool boundary and SQLite against real
+temporary WAL databases, including restart persistence and transaction rollback. The live
 suite is local and non-billable: start retrieval, set `RETRIEVAL_SERVICE_URL`, then
 run `npm.cmd --prefix backend run test:live`. It executes a real Ollama parse,
 retrieval search, and detail lookup.

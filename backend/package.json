@@ -5,7 +5,7 @@
   "description": "Express backend for the Recipe Match hackathon app",
   "main": "src/server.js",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "start": "node src/server.js",

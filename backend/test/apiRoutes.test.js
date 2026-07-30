@@ -1,6 +1,9 @@
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
 const http = require("node:http");
+const os = require("node:os");
+const path = require("node:path");
 const test = require("node:test");
 
 const serverPath = require.resolve("../src/server");
@@ -16,11 +19,15 @@ const storePath = require.resolve("../src/store");
 const managedEnvironmentKeys = [
   "CORS_ORIGINS",
   "DATABASE_URL",
+  "FRONTEND_DIST_PATH",
+  "HOST",
+  "NODE_ENV",
   "PORT",
   "REQUIRE_PERSISTENT_STORE",
   "RETRIEVAL_SERVICE_HOSTPORT",
   "RETRIEVAL_SERVICE_TOKEN",
   "RETRIEVAL_SERVICE_URL",
+  "SQLITE_DATABASE_PATH",
 ];
 const originalEnvironment = Object.fromEntries(
   managedEnvironmentKeys.map((key) => [key, process.env[key]])
@@ -298,6 +305,10 @@ test("health, readiness, cache headers, and framework headers are deterministic"
     assert.equal(health.headers.get("access-control-allow-origin"), "*");
     assert.equal(health.headers.get("cache-control"), "no-store");
     assert.equal(health.headers.get("x-powered-by"), null);
+    assert.equal(health.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(health.headers.get("x-frame-options"), "DENY");
+    assert.equal(health.headers.get("permissions-policy"), "camera=(), microphone=(), geolocation=()");
+    assert.match(health.headers.get("content-security-policy"), /default-src 'self'/);
 
     const unavailable = await request(baseUrl, "/api/ready");
     assertResponse(unavailable, 503, {
@@ -797,6 +808,59 @@ test("Express JSON escaping protects responses containing third-party markup", a
   });
 });
 
+test("production frontend serving supports SPA routes, immutable assets, and API isolation", async () => {
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "dishly-web-"));
+  const assetsDirectory = path.join(temporaryDirectory, "assets");
+  fs.mkdirSync(assetsDirectory);
+  fs.writeFileSync(
+    path.join(temporaryDirectory, "index.html"),
+    '<!doctype html><div id="root"></div><script src="/assets/app-abc123.js"></script>'
+  );
+  fs.writeFileSync(path.join(assetsDirectory, "app-abc123.js"), "window.DISHLY = true;");
+  process.env.FRONTEND_DIST_PATH = temporaryDirectory;
+  process.env.NODE_ENV = "production";
+
+  try {
+    const app = loadApp();
+    await withTestServer(app, async (baseUrl) => {
+      for (const route of ["/", "/deck", "/liked", "/recipe/101"]) {
+        const response = await request(baseUrl, route);
+        assert.equal(response.status, 200);
+        assert.match(response.raw, /id="root"/);
+        assert.equal(response.headers.get("cache-control"), "no-cache");
+        assert.equal(
+          response.headers.get("strict-transport-security"),
+          "max-age=31536000; includeSubDomains"
+        );
+      }
+
+      const asset = await request(baseUrl, "/assets/app-abc123.js");
+      assert.equal(asset.status, 200);
+      assert.equal(asset.raw, "window.DISHLY = true;");
+      assert.equal(asset.headers.get("cache-control"), "public, max-age=31536000, immutable");
+
+      assertResponse(await request(baseUrl, "/api/missing"), 404, {
+        error: "Route not found",
+      });
+      assertResponse(await request(baseUrl, "/missing.js"), 404, {
+        error: "Route not found",
+      });
+    });
+  } finally {
+    fs.rmSync(temporaryDirectory, { force: true, recursive: true });
+  }
+});
+
+test("production frontend serving fails fast when index.html is missing", () => {
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "dishly-web-"));
+  process.env.FRONTEND_DIST_PATH = temporaryDirectory;
+  try {
+    assert.throws(() => loadApp(), /does not contain index\.html/);
+  } finally {
+    fs.rmSync(temporaryDirectory, { force: true, recursive: true });
+  }
+});
+
 test("direct startup rejects an invalid PORT before listening", () => {
   const result = spawnSync(process.execPath, [serverPath], {
     cwd: require("node:path").join(__dirname, ".."),
@@ -807,4 +871,16 @@ test("direct startup rejects an invalid PORT before listening", () => {
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /PORT must be an integer between 1 and 65535/);
+});
+
+test("direct startup rejects an invalid HOST before initializing dependencies", () => {
+  const result = spawnSync(process.execPath, [serverPath], {
+    cwd: path.join(__dirname, ".."),
+    env: { ...process.env, HOST: "invalid host" },
+    encoding: "utf8",
+    timeout: 5000,
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /HOST must be a valid hostname or IP address/);
 });

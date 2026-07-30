@@ -39,6 +39,9 @@ describe("API client", () => {
     expect(resolveApiBaseUrl({
       configuredOrigin: " https://api.example.test/// ",
     })).toBe("https://api.example.test/api");
+    expect(resolveApiBaseUrl({
+      defaultBaseUrl: "/api/",
+    })).toBe("/api");
     expect(resolveApiBaseUrl()).toBe(API_URL);
   });
 

@@ -1,10 +1,16 @@
 const memoryStore = require("./memoryStore");
 
 let postgresStore;
+let sqliteStore;
 
 function hasDatabaseUrl() {
   return typeof process.env.DATABASE_URL === "string"
     && process.env.DATABASE_URL.trim() !== "";
+}
+
+function hasSqliteDatabasePath() {
+  return typeof process.env.SQLITE_DATABASE_PATH === "string"
+    && process.env.SQLITE_DATABASE_PATH.trim() !== "";
 }
 
 function requiresPersistentStore() {
@@ -14,12 +20,21 @@ function requiresPersistentStore() {
 }
 
 function getStore() {
-  if (!hasDatabaseUrl()) return memoryStore;
-  if (!postgresStore) {
-    const { createPostgresStore } = require("./postgresStore");
-    postgresStore = createPostgresStore();
+  if (hasDatabaseUrl()) {
+    if (!postgresStore) {
+      const { createPostgresStore } = require("./postgresStore");
+      postgresStore = createPostgresStore();
+    }
+    return postgresStore;
   }
-  return postgresStore;
+  if (hasSqliteDatabasePath()) {
+    if (!sqliteStore) {
+      const { createSqliteStore } = require("./sqliteStore");
+      sqliteStore = createSqliteStore();
+    }
+    return sqliteStore;
+  }
+  return memoryStore;
 }
 
 async function initializeStore() {
@@ -28,7 +43,7 @@ async function initializeStore() {
 }
 
 async function checkStoreReadiness() {
-  if (!hasDatabaseUrl()) return !requiresPersistentStore();
+  if (!hasDatabaseUrl() && !hasSqliteDatabasePath()) return !requiresPersistentStore();
   try {
     return await getStore().checkReadiness();
   } catch {
@@ -40,6 +55,10 @@ async function closeStore() {
   if (postgresStore) {
     await postgresStore.close();
     postgresStore = undefined;
+  }
+  if (sqliteStore) {
+    await sqliteStore.close();
+    sqliteStore = undefined;
   }
 }
 
@@ -60,11 +79,14 @@ async function getSwipes(...args) {
 }
 
 function getStoreMode() {
-  return hasDatabaseUrl() ? "postgres" : "memory";
+  if (hasDatabaseUrl()) return "postgres";
+  if (hasSqliteDatabasePath()) return "sqlite";
+  return "memory";
 }
 
 function resetStoreForTests() {
   postgresStore = undefined;
+  sqliteStore = undefined;
 }
 
 module.exports = {

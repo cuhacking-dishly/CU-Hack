@@ -27,7 +27,7 @@ React :5173 -> Express :3000 -> Python/FastAPI :8000 -> Ollama :11434
 - Allergy/ingredient exclusions and requested vegan are hard filters in exact
   and closest modes. Nutrition and time guide ranking rather than rejecting food.
 
-## Windows quick start
+## Windows development
 
 Prerequisites: Node.js 24+, npm 11+, 64-bit Python 3.11+ (3.12 tested), and
 [Ollama for Windows](https://ollama.com/download/windows).
@@ -49,6 +49,33 @@ at [http://localhost:3000/api/ready](http://localhost:3000/api/ready).
 No secret is required. Keep `RETRIEVAL_SERVICE_URL` server-side because the
 browser should talk only to Express.
 
+## Free public production
+
+The supported public topology costs $0: this machine runs React, Express,
+SQLite, FastAPI, Ollama, the reviewed corpus, and the vector index; a free
+Tailscale Funnel publishes only Express over HTTPS. No card, hosted database,
+cloud AI API, Render service, or Vercel project is required.
+
+After the one-time free Tailscale sign-in, run from elevated PowerShell:
+
+```powershell
+npm.cmd run production:start
+```
+
+The command installs/builds, starts the complete loopback-only stack, verifies
+real qwen3 and embeddinggemma behavior, publishes the HTTPS URL, and verifies the
+public E2E API. Operational commands:
+
+```powershell
+npm.cmd run production:status
+npm.cmd run production:stop
+```
+
+The host computer must remain powered on, awake, and online. See
+[zero-cost production deployment](./docs/PRODUCTION_DEPLOYMENT.md) for one-time
+authorization, state locations, logs, verification, backup, upgrade, rollback,
+and troubleshooting.
+
 ## Commands
 
 | Command | Purpose |
@@ -58,6 +85,9 @@ browser should talk only to Express.
 | `npm.cmd run test:python` | Lint and test Python with a 90% branch-coverage gate. |
 | `npm.cmd run verify` | Run every deterministic Python/backend/frontend/build/browser check. |
 | `npm.cmd --prefix backend run test:live` | Exercise the real local Ollama parse/search/detail path; requires retrieval running. |
+| `npm.cmd run production:start` | Build, start, publish, and verify the $0 production stack. |
+| `npm.cmd run production:status` | Report processes, dependency readiness, and Funnel state. |
+| `npm.cmd run production:stop` | Remove the Funnel and stop services without deleting state. |
 
 The same release gate runs on Linux for every pull request and every push to
 `main`. In addition to the local matrix, it validates the OpenAPI and deployment
@@ -84,9 +114,9 @@ scripts/        reproducible Windows/Linux setup and verification
 ```
 
 Local development stores goals and swipes in memory with no database setup.
-Production can set `DATABASE_URL` to use the checked-in PostgreSQL repository and
-`REQUIRE_PERSISTENT_STORE=true` to fail readiness rather than silently falling
-back to process-local state.
+Zero-cost production sets `SQLITE_DATABASE_PATH` and
+`REQUIRE_PERSISTENT_STORE=true`. PostgreSQL remains available through
+`DATABASE_URL` and takes precedence when explicitly configured.
 
 ## Documentation
 

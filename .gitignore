@@ -47,6 +47,12 @@ frontend/.cache/
 
 # Root development tooling
 /node_modules/
+/.cache/
+/.runtime/
+/.dishly/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 
 # Logs and local editor files
 *.log

@@ -54,6 +54,7 @@ environment file.
 | `npm.cmd run test:coverage` | Run Vitest and enforce coverage thresholds. |
 | `npm.cmd run test:e2e` | Run the mocked-API Playwright browser suite. |
 | `npm.cmd run test:e2e:fullstack` | Run Playwright through the real Express routes with deterministic provider boundaries. |
+| `npm.cmd run test:e2e:production` | Run the built SPA and Express/SQLite on one production-shaped origin at desktop and mobile sizes. |
 | `npm.cmd run test:all` | Run lint, coverage, production build, and browser regressions. |
 
 The browser suite uses the Microsoft Edge installation already present on the demo laptop. In a clean CI environment, install Edge with Playwright before running `test:e2e`.
@@ -82,7 +83,11 @@ The deck requests `10` recipes at a time with explicit `limit` and `offset` valu
   destinations. It intentionally exposes no server-rendering or action surface.
 - MSW intercepts the real Axios requests only inside tests. It is a development dependency and creates no production fallback or mock-data path.
 - The standard Playwright browser suite runs against Microsoft Edge and a real Vite server, but deliberately intercepts `/api` with contract-faithful fixtures. It covers browser flow, responsive layout at laptop, 390px, and 320px viewports, and reduced-motion behavior; it is not a frontend-to-Express test.
-- The separate full-stack browser check starts the actual Express routes with deterministic test-only private-service boundaries. It sends the production Axios client across the real CORS boundary and verifies goal storage, pagination, swipe storage, exact detail navigation, and deck resume without model inference.
+- The separate full-stack browser check starts the actual Express routes with deterministic test-only private-service boundaries. It sends the development Axios client across the real CORS boundary and verifies goal storage, pagination, swipe storage, exact detail navigation, and deck resume without model inference.
+- The production-shaped browser check serves the built bundle from Express,
+  uses real temporary SQLite persistence and same-origin `/api`, validates CSP
+  and direct routes, completes keyboard goal entry, swiping, liked recipes, and
+  cold detail fetches at 1440px and Pixel 7 dimensions.
 - `test:coverage` enforces 85% statements, lines, and functions plus 80% branches across production JavaScript.
 
 The full-stack suite defaults to ports `3000` and `5173`. If either belongs to
@@ -148,8 +153,9 @@ e2e/                         Edge-backed browser regressions
 ```
 
 Because the app uses browser history routing, a production web host must rewrite direct requests such as `/deck` and `/recipe/12345` to `index.html`.
-`vercel.json` provides the fallback and response-hardening headers for Vercel.
-The Render Blueprint defines the equivalent static-site rewrite. See
+The zero-cost host does this inside Express while preserving JSON 404s under
+`/api` and immutable caching for hashed assets. `vercel.json` remains as an
+optional static-host equivalent. See
 [`../docs/PRODUCTION_DEPLOYMENT.md`](../docs/PRODUCTION_DEPLOYMENT.md).
 
 ## UI & motion system
