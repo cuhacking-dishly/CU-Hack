@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import uvicorn
@@ -140,16 +141,8 @@ def main(arguments: list[str] | None = None) -> int:
 def _settings_with_path_overrides(settings: Settings, args: argparse.Namespace) -> Settings:
     """Return a new immutable settings object with optional CLI paths."""
 
-    return Settings(
+    return replace(
+        settings,
         data_path=args.data or settings.data_path,
         index_path=args.index or settings.index_path,
-        ollama_host=settings.ollama_host,
-        ollama_model=settings.ollama_model,
-        ollama_expected_dimension=settings.ollama_expected_dimension,
-        ollama_connect_timeout_seconds=settings.ollama_connect_timeout_seconds,
-        ollama_read_timeout_seconds=settings.ollama_read_timeout_seconds,
-        embedding_batch_size=settings.embedding_batch_size,
-        service_host=settings.service_host,
-        service_port=settings.service_port,
-        auto_build_index=settings.auto_build_index,
     )

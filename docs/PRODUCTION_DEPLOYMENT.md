@@ -146,6 +146,10 @@ npm.cmd run verify
 npm.cmd run test:local-rag
 ```
 
+The checked-in GitHub Actions release gate repeats the deterministic matrix on
+Ubuntu and additionally builds and smoke-tests the exact retrieval Docker image.
+Do not deploy a commit whose **Release gate** workflow is not green.
+
 ## Troubleshooting
 
 - **API readiness says retrieval false:** inspect the retrieval logs for model

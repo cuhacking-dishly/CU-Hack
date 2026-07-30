@@ -124,6 +124,42 @@ class CliTests(unittest.TestCase):
             "dishly_retrieval.api:app", host="127.0.0.1", port=8123, reload=False
         )
 
+    def test_path_overrides_preserve_all_environment_configuration(self) -> None:
+        engine = Mock()
+        engine.readiness.return_value = {"ok": True}
+        environment = {
+            "DISHLY_AUTO_BUILD_INDEX": "true",
+            "DISHLY_EMBEDDING_BATCH_SIZE": "7",
+            "DISHLY_SERVICE_TOKEN": "s" * 32,
+            "OLLAMA_EMBEDDING_MODEL": "custom-embedding",
+            "OLLAMA_PARSER_MODEL": "custom-parser",
+            "OLLAMA_PARSER_TIMEOUT_SECONDS": "245",
+        }
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, environment, clear=True
+        ), patch(
+            "dishly_retrieval.cli.RetrievalEngine.from_settings",
+            return_value=engine,
+        ) as create_engine:
+            root = Path(directory)
+            data_path = root / "recipes.json"
+            index_path = root / "embeddings.json"
+            code, _output, _error = self.invoke(
+                ["--data", str(data_path), "--index", str(index_path), "status"]
+            )
+
+        self.assertEqual(code, 0)
+        settings = create_engine.call_args.args[0]
+        self.assertEqual(settings.data_path, data_path)
+        self.assertEqual(settings.index_path, index_path)
+        self.assertEqual(settings.ollama_model, "custom-embedding")
+        self.assertEqual(settings.ollama_parser_model, "custom-parser")
+        self.assertEqual(settings.ollama_parser_timeout_seconds, 245)
+        self.assertEqual(settings.embedding_batch_size, 7)
+        self.assertEqual(settings.service_token, "s" * 32)
+        self.assertTrue(settings.auto_build_index)
+        engine.close.assert_called_once()
+
     def test_operational_errors_return_nonzero_without_traceback(self) -> None:
         with patch(
             "dishly_retrieval.cli.load_recipes",

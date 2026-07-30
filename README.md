@@ -1,5 +1,7 @@
 # Dishly Recipe Match
 
+[![Release gate](https://github.com/cuhacking-dishly/CU-Hack/actions/workflows/release-gate.yml/badge.svg)](https://github.com/cuhacking-dishly/CU-Hack/actions/workflows/release-gate.yml)
+
 Dishly is a local-first recipe discovery app. A user describes a meal in natural
 language, a local Ollama model converts that request into a validated filter,
 and a hybrid RAG service retrieves real publisher recipes from Dishly's reviewed
@@ -31,7 +33,7 @@ Prerequisites: Node.js 24+, npm 11+, 64-bit Python 3.11+ (3.12 tested), and
 [Ollama for Windows](https://ollama.com/download/windows).
 
 ```powershell
-git clone https://github.com/Jeffrey-dai17/CU-Hack.git
+git clone https://github.com/cuhacking-dishly/CU-Hack.git
 cd CU-Hack
 npm.cmd ci
 npm.cmd run setup
@@ -56,6 +58,12 @@ browser should talk only to Express.
 | `npm.cmd run test:python` | Lint and test Python with a 90% branch-coverage gate. |
 | `npm.cmd run verify` | Run every deterministic Python/backend/frontend/build/browser check. |
 | `npm.cmd --prefix backend run test:live` | Exercise the real local Ollama parse/search/detail path; requires retrieval running. |
+
+The same release gate runs on Linux for every pull request and every push to
+`main`. In addition to the local matrix, it validates the OpenAPI and deployment
+schemas, builds the exact Render retrieval image, validates its embedded corpus,
+and starts the packaged Ollama CLI. Failed browser traces, screenshots, and
+videos are retained as workflow artifacts.
 
 ## Raspberry Pi
 
