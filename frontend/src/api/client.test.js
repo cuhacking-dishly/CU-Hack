@@ -30,7 +30,7 @@ const recipe = {
 
 describe("API client", () => {
   it("allows the backend's provider deadline to complete before timing out", () => {
-    expect(API_TIMEOUT_MS).toBe(35_000);
+    expect(API_TIMEOUT_MS).toBe(100_000);
   });
 
   it.each([

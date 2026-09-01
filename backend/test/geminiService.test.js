@@ -35,7 +35,7 @@ function installSdkMock(generateContent) {
 }
 
 test.afterEach(() => {
-  for (const name of ["GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_TIMEOUT_MS"]) {
+  for (const name of ["GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_TIMEOUT_MS", "NODE_ENV"]) {
     delete process.env[name];
   }
   clearModules();
@@ -127,7 +127,7 @@ test("parseGoal uses the supported SDK, structured output, and a separate user i
   assert.equal(typeof request.config.abortSignal.addEventListener, "function");
 });
 
-test("parseGoal defaults to gemini-3.5-flash and a 30 second deadline", async (t) => {
+test("parseGoal defaults to gemini-3.5-flash and a 90 second deadline", async (t) => {
   process.env.GEMINI_API_KEY = "test-key";
   process.env.GEMINI_TIMEOUT_MS = "not-a-number";
   let capturedTimeout;
@@ -140,15 +140,36 @@ test("parseGoal defaults to gemini-3.5-flash and a 30 second deadline", async (t
     "../src/services/geminiService"
   );
 
-  assert.equal(DEFAULT_GEMINI_TIMEOUT_MS, 30000);
+  assert.equal(DEFAULT_GEMINI_TIMEOUT_MS, 90000);
   assert.equal(parseGoalWithGemini, parseGoal);
   assert.deepEqual(await parseGoal("just something tasty"), {});
   assert.deepEqual(capture.constructorOptions[0], {
     apiKey: "test-key",
-    httpOptions: { timeout: 30000 },
+    httpOptions: { timeout: 90000 },
   });
   assert.equal(capture.requests[0].model, "gemini-3.5-flash");
-  assert.equal(capturedTimeout, 30000);
+  assert.equal(capturedTimeout, 90000);
+});
+
+test("parseGoal enforces the production timeout floor over stale hosting configuration", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  process.env.GEMINI_TIMEOUT_MS = "30000";
+  process.env.NODE_ENV = "production";
+  let capturedTimeout;
+  t.mock.method(AbortSignal, "timeout", (timeout) => {
+    capturedTimeout = timeout;
+    return new AbortController().signal;
+  });
+  const capture = installSdkMock(async () => ({ text: "{}" }));
+  const { PRODUCTION_GEMINI_TIMEOUT_MS, parseGoal } = require("../src/services/geminiService");
+
+  assert.equal(PRODUCTION_GEMINI_TIMEOUT_MS, 90000);
+  assert.deepEqual(await parseGoal("just something tasty"), {});
+  assert.deepEqual(capture.constructorOptions[0], {
+    apiKey: "test-key",
+    httpOptions: { timeout: 90000 },
+  });
+  assert.equal(capturedTimeout, 90000);
 });
 
 test("parseGoal maps empty, malformed, and non-object model output to a safe 502", async () => {

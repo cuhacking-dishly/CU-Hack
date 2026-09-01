@@ -41,6 +41,11 @@ The Vercel project root must remain `frontend`. Its committed `vercel.json`
 rewrites all paths to `index.html`; without that rule, refreshing `/deck`,
 `/liked`, or `/recipe/:id` returns a platform 404 instead of loading the SPA.
 
+Production enforces a 90-second Gemini deadline and a 100-second browser API
+deadline. Keep the browser deadline longer than the provider deadline so a
+slow provider response is reported accurately instead of becoming a generic
+client timeout.
+
 ## Release verification
 
 From the repository root on Windows:

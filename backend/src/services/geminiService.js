@@ -3,7 +3,8 @@ const { GoogleGenAI } = require("@google/genai");
 const { GOAL_FILTER_JSON_SCHEMA, normalizeGoalFilter } = require("./goalFilter");
 
 const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
-const DEFAULT_GEMINI_TIMEOUT_MS = 30000;
+const DEFAULT_GEMINI_TIMEOUT_MS = 90000;
+const PRODUCTION_GEMINI_TIMEOUT_MS = 90000;
 const MIN_TIMEOUT_MS = 100;
 const MAX_TIMEOUT_MS = 120000;
 const MAX_GOAL_TEXT_LENGTH = 1000;
@@ -62,15 +63,20 @@ function getGeminiConfig() {
     });
   }
 
+  const configuredTimeoutMs = readBoundedInteger(
+    "GEMINI_TIMEOUT_MS",
+    DEFAULT_GEMINI_TIMEOUT_MS,
+    MIN_TIMEOUT_MS,
+    MAX_TIMEOUT_MS
+  );
+
   return {
     apiKey,
     model: String(process.env.GEMINI_MODEL || "").trim() || DEFAULT_GEMINI_MODEL,
-    timeoutMs: readBoundedInteger(
-      "GEMINI_TIMEOUT_MS",
-      DEFAULT_GEMINI_TIMEOUT_MS,
-      MIN_TIMEOUT_MS,
-      MAX_TIMEOUT_MS
-    ),
+    timeoutMs:
+      process.env.NODE_ENV === "production"
+        ? Math.max(configuredTimeoutMs, PRODUCTION_GEMINI_TIMEOUT_MS)
+        : configuredTimeoutMs,
   };
 }
 
@@ -189,6 +195,7 @@ async function parseGoal(rawText) {
 module.exports = {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_TIMEOUT_MS,
+  PRODUCTION_GEMINI_TIMEOUT_MS,
   GeminiServiceError,
   parseGoal,
   parseGoalWithGemini: parseGoal,

@@ -45,7 +45,7 @@ Put real provider keys in `.env`. Never put keys in `.env.example`, frontend env
 | `PORT` | No | `3000` | HTTP port, integer `1..65535`. Invalid values stop startup. |
 | `GEMINI_API_KEY` | For goal parsing | None | Server-side Gemini API key. |
 | `GEMINI_MODEL` | No | `gemini-3.5-flash` | Gemini model used for structured goal parsing. |
-| `GEMINI_TIMEOUT_MS` | No | `30000` | Gemini timeout in milliseconds. Valid range `100..120000`; invalid values use the default. |
+| `GEMINI_TIMEOUT_MS` | No | `90000` | Gemini timeout in milliseconds. Valid range `100..120000`; production enforces a 90-second floor so stale hosting configuration cannot restore the old flaky deadline. |
 | `SPOONACULAR_API_KEY` | For recipes | None | Server-side Spoonacular API key. |
 | `SPOONACULAR_TIMEOUT_MS` | No | `8000` | Spoonacular timeout in milliseconds. Valid range `100..120000`; invalid values use the default. |
 | `CORS_ORIGINS` | No | Permissive | Comma-separated exact browser origins. Blank, unset, or any `*` allows every origin. |
