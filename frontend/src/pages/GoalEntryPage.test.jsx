@@ -451,7 +451,9 @@ describe("GoalEntryPage", () => {
     await user.type(screen.getByLabelText("Your food goal"), "high protein");
     await user.click(screen.getByRole("button", { name: "Start swiping" }));
 
-    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't create your recipe matches. Please try again.",
+    );
     expect(readDeckSession(USER_ID, oldGoalVersion)).toEqual(oldDeck);
   });
 });
