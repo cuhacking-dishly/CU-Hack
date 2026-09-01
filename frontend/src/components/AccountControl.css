@@ -1,26 +1,39 @@
 .account-control { position: fixed; z-index: 90; top: 16px; right: 18px; }
-.account-control--loading { width: 74px; height: 34px; }
-.account-sign-in, .account-avatar-button { min-height: 38px; border: 1px solid rgba(49,95,63,.3); border-radius: 999px; padding: 0 15px; color: #173522; background: rgba(255,250,240,.92); box-shadow: 0 8px 24px rgba(18,31,22,.12); font-weight: 850; cursor: pointer; backdrop-filter: blur(12px); }
-.account-sign-in:hover, .account-avatar-button:hover { border-color: #315f3f; background: #fffaf0; transform: translateY(-1px); }
+.account-control--loading { width: 108px; height: 38px; }
+.account-sign-in, .account-avatar-button { min-height: 40px; border: 1px solid rgba(49,95,63,.32); border-radius: 999px; padding: 0 16px; color: #173522; background: rgba(255,250,240,.96); box-shadow: 0 8px 24px rgba(18,31,22,.12); font-weight: 850; cursor: pointer; backdrop-filter: blur(12px); transition: transform 160ms ease, border-color 160ms ease, background 160ms ease; }
+.account-sign-in:hover, .account-avatar-button:hover { border-color: #315f3f; background: #fffdf7; transform: translateY(-1px); }
+.account-sign-in:focus-visible, .account-avatar-button:focus-visible, .account-dialog button:focus-visible, .account-dialog input:focus-visible { outline: 3px solid rgba(229,196,110,.85); outline-offset: 2px; }
 .account-avatar-button { display: flex; align-items: center; gap: 8px; max-width: 180px; padding: 4px 12px 4px 5px; }
 .account-avatar-button img, .account-avatar-button > span:first-child { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; border-radius: 50%; object-fit: cover; color: white; background: #315f3f; }
 .account-avatar-button > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.account-dialog-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(8,17,12,.66); backdrop-filter: blur(8px); }
-.account-dialog { position: relative; width: min(100%, 460px); border: 1px solid rgba(229,196,110,.55); border-radius: 24px; padding: 30px; color: #18231d; background: #fffaf0; box-shadow: 0 32px 90px rgba(0,0,0,.42); }
-.account-dialog h2 { margin-bottom: 10px; font-family: Georgia,"Times New Roman",serif; font-size: 2rem; }
-.account-dialog p { line-height: 1.55; }
-.account-dialog small { display: block; margin-top: 18px; color: #586957; }
-.account-dialog-close { position: absolute; top: 11px; right: 13px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; font-size: 1.6rem; cursor: pointer; }
-.account-dialog-eyebrow { margin: 0 0 7px; color: #315f3f; font-size: .75rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
-.account-google-button, .account-email-row button { width: 100%; min-height: 44px; border: 0; border-radius: 12px; color: white; background: #315f3f; font-weight: 850; cursor: pointer; }
-.account-google-button:disabled, .account-email-row button:disabled { opacity: .6; cursor: wait; }
-.account-divider { display: flex; align-items: center; gap: 10px; margin: 17px 0; color: #6c796e; font-size: .78rem; }
+.account-dialog-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(8,17,12,.64); backdrop-filter: blur(8px); }
+.account-dialog { position: relative; width: min(100%, 390px); max-height: calc(100dvh - 40px); overflow-y: auto; border: 1px solid rgba(229,196,110,.52); border-radius: 20px; padding: 28px; color: #18231d; background: #fffaf0; box-shadow: 0 30px 80px rgba(0,0,0,.4); box-sizing: border-box; }
+.account-dialog h2 { margin: 0; padding-right: 34px; font-family: Georgia,"Times New Roman",serif; font-size: clamp(1.7rem, 5vw, 2rem); line-height: 1.1; }
+.account-dialog-subtitle { margin: 8px 0 22px; color: #58675d; line-height: 1.45; }
+.account-dialog small { display: block; margin-top: 7px; color: #6b776d; font-size: .75rem; text-align: center; }
+.account-dialog-close { position: absolute; top: 14px; right: 14px; display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; color: #243127; background: transparent; font-size: 1.55rem; line-height: 1; cursor: pointer; }
+.account-dialog-close:hover { background: rgba(49,95,63,.08); }
+.account-google-button, .account-email-button { width: 100%; min-height: 46px; border: 1px solid rgba(65,50,34,.2); border-radius: 11px; color: #1f2922; background: #fff; font-weight: 850; cursor: pointer; }
+.account-google-button { display: grid; grid-template-columns: 20px 1fr 20px; align-items: center; gap: 10px; padding: 0 14px; }
+.account-google-button span { grid-column: 2; }
+.account-google-mark { width: 19px; height: 19px; }
+.account-google-button:disabled, .account-email-button:disabled, .account-dialog input:disabled { opacity: .48; cursor: not-allowed; }
+.account-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: #7b857d; font-size: .76rem; }
 .account-divider::before, .account-divider::after { content: ""; height: 1px; flex: 1; background: rgba(65,50,34,.18); }
 .account-dialog label { display: block; margin-bottom: 7px; font-size: .82rem; font-weight: 850; }
-.account-email-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-.account-email-row input { min-width: 0; min-height: 44px; border: 1px solid rgba(65,50,34,.22); border-radius: 12px; padding: 0 12px; background: white; }
-.account-email-row button { width: auto; padding: 0 16px; }
-.account-status, .account-unavailable { border-radius: 12px; padding: 11px 13px; color: #20462d; background: #dfead5; font-size: .88rem; font-weight: 750; }
+.account-dialog form { display: grid; gap: 10px; }
+.account-dialog form label { margin-bottom: -3px; }
+.account-dialog form input { width: 100%; min-width: 0; min-height: 46px; border: 1px solid rgba(65,50,34,.23); border-radius: 11px; padding: 0 13px; color: #18231d; background: white; font: inherit; box-sizing: border-box; }
+.account-dialog form input::placeholder { color: #8a928c; }
+.account-email-button { border-color: #315f3f; color: white; background: #315f3f; }
+.account-google-button:not(:disabled):hover { border-color: rgba(49,95,63,.55); background: #fbfcfa; }
+.account-email-button:not(:disabled):hover { background: #254c32; }
+.account-status, .account-unavailable { border-radius: 10px; padding: 10px 12px; font-size: .82rem; line-height: 1.4; }
+.account-unavailable { margin: -8px 0 16px; color: #604b18; background: #f4ead0; }
+.account-status { margin: 12px 0 0; color: #20462d; background: #dfead5; }
+.account-status--error { color: #7e291d; background: #f7dfda; }
+.account-guest-button { display: block; margin: 15px auto 0; border: 0; padding: 4px 8px; color: #405448; background: transparent; font: inherit; font-size: .86rem; font-weight: 800; text-decoration: underline; text-decoration-color: rgba(64,84,72,.35); text-underline-offset: 3px; cursor: pointer; }
+.account-guest-button:hover { color: #173522; text-decoration-color: currentColor; }
 .account-menu { position: absolute; top: calc(100% + 8px); right: 0; width: 235px; display: grid; overflow: hidden; border: 1px solid rgba(65,50,34,.18); border-radius: 16px; color: #18231d; background: #fffaf0; box-shadow: 0 20px 55px rgba(0,0,0,.28); }
 .account-menu-identity { display: grid; gap: 2px; padding: 14px 15px; border-bottom: 1px solid rgba(65,50,34,.12); }
 .account-menu-identity span { overflow: hidden; color: #586957; font-size: .78rem; text-overflow: ellipsis; }
@@ -28,4 +41,6 @@
 .account-menu a:hover, .account-menu button:hover { background: #edf2e8; }
 .account-menu p { margin: 0; padding: 9px 15px; color: #586957; font-size: .76rem; }
 .account-menu .account-delete { color: #9d3223; }
-@media (max-width: 600px) { .account-control { top: 10px; right: 10px; } .account-avatar-button > span:last-child { display: none; } .account-avatar-button { padding-right: 5px; } .account-dialog { padding: 28px 20px 22px; } .account-email-row { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .account-control { top: 10px; right: 10px; } .account-sign-in { min-height: 38px; padding: 0 13px; font-size: .82rem; } .account-avatar-button > span:last-child { display: none; } .account-avatar-button { padding-right: 5px; } .account-dialog-backdrop { align-items: end; padding: 10px; } .account-dialog { width: 100%; max-height: calc(100dvh - 20px); border-radius: 20px; padding: 25px 20px 20px; } }
+
+@media (prefers-reduced-motion: reduce) { .account-sign-in, .account-avatar-button { transition: none; } }

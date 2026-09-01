@@ -32,12 +32,38 @@ describe("AccountControl", () => {
   it("opens optional sign-in without blocking guest mode and closes accessibly", async () => {
     const user = userEvent.setup();
     renderControl({ authReady: true, accountAvailable: false });
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(screen.getByRole("dialog", { name: "Save recipes everywhere" })).toBeVisible();
-    expect(screen.getByText(/fully usable as a guest/i)).toBeVisible();
-    expect(screen.getByText(/being connected/i)).toBeVisible();
+    const signIn = screen.getByRole("button", { name: "Sign in to save" });
+    await user.click(signIn);
+    expect(screen.getByRole("dialog", { name: "Sign in to Dishly" })).toBeVisible();
+    expect(screen.getByText(/save your recipes on every device/i)).toBeVisible();
+    expect(screen.getByText(/isn’t available yet/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Continue with Google" })).toBeDisabled();
+    expect(screen.getByLabelText("Email address")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send sign-in link" })).toBeDisabled();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(signIn).toHaveFocus();
+  });
+
+  it("lets guests dismiss sign-in with an explicit guest action", async () => {
+    const user = userEvent.setup();
+    renderControl({ authReady: true, accountAvailable: false });
+    await user.click(screen.getByRole("button", { name: "Sign in to save" }));
+    await user.click(screen.getByRole("button", { name: "Continue as guest" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps keyboard focus inside the open sign-in dialog", async () => {
+    const user = userEvent.setup();
+    renderControl({ authReady: true, accountAvailable: false });
+    await user.click(screen.getByRole("button", { name: "Sign in to save" }));
+    const close = screen.getByRole("button", { name: "Close sign-in" });
+    const guest = screen.getByRole("button", { name: "Continue as guest" });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(guest).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(close).toHaveFocus();
   });
 
   it("starts Google OAuth and sends passwordless email magic links", async () => {
@@ -45,16 +71,16 @@ describe("AccountControl", () => {
     const signInWithOAuth = vi.fn().mockResolvedValue({ error: null });
     const signInWithOtp = vi.fn().mockResolvedValue({ error: null });
     const first = renderControl({ authReady: true, accountAvailable: true, supabase: { auth: { signInWithOAuth, signInWithOtp } } });
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(screen.getByRole("button", { name: "Sign in to save" }));
     await user.click(screen.getByRole("button", { name: "Continue with Google" }));
     expect(signInWithOAuth).toHaveBeenCalledWith({ provider: "google", options: { redirectTo: window.location.origin } });
 
     first.unmount();
     renderControl({ authReady: true, accountAvailable: true, supabase: { auth: { signInWithOAuth, signInWithOtp } } });
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(screen.getByRole("button", { name: "Sign in to save" }));
 
     await user.type(screen.getByLabelText("Email address"), "cook@example.com");
-    await user.click(screen.getByRole("button", { name: "Email link" }));
+    await user.click(screen.getByRole("button", { name: "Send sign-in link" }));
     expect(signInWithOtp).toHaveBeenCalledWith({ email: "cook@example.com", options: { emailRedirectTo: window.location.origin } });
     expect(screen.getByText(/check your email/i)).toBeVisible();
   });
@@ -64,11 +90,11 @@ describe("AccountControl", () => {
     const signInWithOAuth = vi.fn().mockResolvedValue({ error: new Error("Google unavailable") });
     const signInWithOtp = vi.fn().mockResolvedValue({ error: new Error("Email unavailable") });
     renderControl({ authReady: true, accountAvailable: true, supabase: { auth: { signInWithOAuth, signInWithOtp } } });
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(screen.getByRole("button", { name: "Sign in to save" }));
     await user.click(screen.getByRole("button", { name: "Continue with Google" }));
     expect(screen.getByText("Google unavailable")).toBeVisible();
     await user.type(screen.getByLabelText("Email address"), "cook@example.com");
-    await user.click(screen.getByRole("button", { name: "Email link" }));
+    await user.click(screen.getByRole("button", { name: "Send sign-in link" }));
     expect(screen.getByText("Email unavailable")).toBeVisible();
   });
 

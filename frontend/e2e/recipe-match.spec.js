@@ -184,15 +184,17 @@ test.beforeEach(async ({ page }) => {
 test("keeps guest mode primary while optional sign-in stays in the top right", async ({ page }) => {
   await installApiFixtures(page);
   await page.goto("/");
-  const signIn = page.getByRole("button", { name: "Sign in" });
+  const signIn = page.getByRole("button", { name: "Sign in to save" });
   await expect(signIn).toBeVisible();
   const box = await signIn.boundingBox();
   expect(box.x + box.width).toBeGreaterThan(page.viewportSize().width - 32);
   await signIn.click();
-  await expect(page.getByRole("dialog", { name: "Save recipes everywhere" })).toBeVisible();
-  await expect(page.getByText(/fully usable as a guest/i)).toBeVisible();
-  await expect(page.getByText(/being connected/i)).toBeVisible();
-  await page.getByRole("button", { name: "Close sign-in" }).click();
+  await expect(page.getByRole("dialog", { name: "Sign in to Dishly" })).toBeVisible();
+  await expect(page.getByText(/save your recipes on every device/i)).toBeVisible();
+  await expect(page.getByText(/isn’t available yet/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google" })).toBeDisabled();
+  await expect(page.getByLabel("Email address")).toBeDisabled();
+  await page.getByRole("button", { name: "Continue as guest" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 

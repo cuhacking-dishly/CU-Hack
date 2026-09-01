@@ -7,7 +7,14 @@ function AccountControl() {
   const auth = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const signInRef = useRef(null);
+  const dialogWasOpen = useRef(false);
   const displayName = getDisplayName(auth.user);
+
+  useEffect(() => {
+    if (dialogWasOpen.current && !dialogOpen) signInRef.current?.focus();
+    dialogWasOpen.current = dialogOpen;
+  }, [dialogOpen]);
 
   if (!auth.authReady) {
     return <div className="account-control account-control--loading" aria-label="Checking sign-in status" />;
@@ -16,8 +23,8 @@ function AccountControl() {
   if (!auth.user) {
     return (
       <div className="account-control">
-        <button type="button" className="account-sign-in" onClick={() => setDialogOpen(true)}>
-          Sign in
+        <button ref={signInRef} type="button" className="account-sign-in" onClick={() => setDialogOpen(true)}>
+          Sign in to save
         </button>
         {dialogOpen ? <SignInDialog auth={auth} onClose={() => setDialogOpen(false)} /> : null}
       </div>
@@ -44,66 +51,117 @@ function AccountControl() {
 function SignInDialog({ auth, onClose }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("");
+  const [statusIsError, setStatusIsError] = useState(false);
   const [busy, setBusy] = useState(false);
   const closeRef = useRef(null);
+  const dialogRef = useRef(null);
+  const accountAvailable = Boolean(auth.accountAvailable && auth.supabase?.auth);
 
   useEffect(() => {
     closeRef.current?.focus();
-    function escape(event) { if (event.key === "Escape") onClose(); }
-    window.addEventListener("keydown", escape);
-    return () => window.removeEventListener("keydown", escape);
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [...(dialogRef.current?.querySelectorAll("button:not([disabled]), input:not([disabled])") || [])];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   async function signInWithGoogle() {
+    if (!accountAvailable) return;
     setBusy(true);
     setStatus("");
+    setStatusIsError(false);
     const { error } = await auth.supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
     });
-    if (error) { setStatus(error.message); setBusy(false); }
+    if (error) {
+      setStatus(error.message);
+      setStatusIsError(true);
+      setBusy(false);
+    }
   }
 
   async function emailMagicLink(event) {
     event.preventDefault();
+    if (!accountAvailable) return;
     setBusy(true);
     setStatus("");
+    setStatusIsError(false);
     const { error } = await auth.supabase.auth.signInWithOtp({
       email: email.trim(),
       options: { emailRedirectTo: window.location.origin },
     });
     setStatus(error ? error.message : "Check your email for your secure Dishly sign-in link.");
+    setStatusIsError(Boolean(error));
     setBusy(false);
   }
 
   return (
     <div className="account-dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title">
+      <section ref={dialogRef} className="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title" aria-describedby="account-dialog-description">
         <button ref={closeRef} type="button" className="account-dialog-close" onClick={onClose} aria-label="Close sign-in">×</button>
-        <p className="account-dialog-eyebrow">Optional account</p>
-        <h2 id="account-dialog-title">Save recipes everywhere</h2>
-        <p>Dishly stays fully usable as a guest. Sign in only if you want your liked recipes, notes, ratings, and collections synced.</p>
-        {!auth.accountAvailable ? (
-          <div className="account-unavailable" role="status">Cloud accounts are being connected. Guest mode is still ready to use.</div>
-        ) : (
-          <>
-            <button type="button" className="account-google-button" onClick={signInWithGoogle} disabled={busy}>
-              Continue with Google
-            </button>
-            <div className="account-divider"><span>or use a magic link</span></div>
-            <form onSubmit={emailMagicLink}>
-              <label htmlFor="dishly-sign-in-email">Email address</label>
-              <div className="account-email-row">
-                <input id="dishly-sign-in-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
-                <button type="submit" disabled={busy}>Email link</button>
-              </div>
-            </form>
-            {status ? <p className="account-status" role="status">{status}</p> : null}
-          </>
-        )}
-        <small>No password to remember. The account layer uses Supabase's free plan.</small>
+        <h2 id="account-dialog-title">Sign in to Dishly</h2>
+        <p id="account-dialog-description" className="account-dialog-subtitle">Save your recipes on every device.</p>
+
+        {!accountAvailable ? (
+          <p className="account-unavailable" role="status">Sign-in isn’t available yet. Guest mode still works normally.</p>
+        ) : null}
+
+        <button type="button" className="account-google-button" onClick={signInWithGoogle} disabled={busy || !accountAvailable}>
+          <GoogleMark />
+          <span>Continue with Google</span>
+        </button>
+
+        <div className="account-divider"><span>or</span></div>
+
+        <form onSubmit={emailMagicLink}>
+          <label htmlFor="dishly-sign-in-email">Email address</label>
+          <input
+            id="dishly-sign-in-email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="you@example.com"
+            disabled={busy || !accountAvailable}
+          />
+          <button type="submit" className="account-email-button" disabled={busy || !accountAvailable}>Send sign-in link</button>
+        </form>
+
+        {status ? <p className={`account-status${statusIsError ? " account-status--error" : ""}`} role={statusIsError ? "alert" : "status"}>{status}</p> : null}
+
+        <button type="button" className="account-guest-button" onClick={onClose}>Continue as guest</button>
+        <small>No password required.</small>
       </section>
     </div>
+  );
+}
+
+function GoogleMark() {
+  return (
+    <svg className="account-google-mark" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M21.6 12.23c0-.74-.07-1.46-.19-2.15H12v4.07h5.38a4.6 4.6 0 0 1-2 3.02v2.64h3.24c1.9-1.75 2.98-4.33 2.98-7.58Z" />
+      <path fill="#34A853" d="M12 22c2.7 0 4.98-.9 6.63-2.43l-3.24-2.64c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.73A10 10 0 0 0 12 22Z" />
+      <path fill="#FBBC05" d="M6.39 13.76A6.02 6.02 0 0 1 6.07 12c0-.61.11-1.2.32-1.76V7.51H3.04A10 10 0 0 0 2 12c0 1.61.39 3.14 1.04 4.49l3.35-2.73Z" />
+      <path fill="#EA4335" d="M12 6.11c1.47 0 2.79.51 3.83 1.5l2.87-2.88A9.64 9.64 0 0 0 12 2a10 10 0 0 0-8.96 5.51l3.35 2.73C7.18 7.87 9.39 6.11 12 6.11Z" />
+    </svg>
   );
 }
 
