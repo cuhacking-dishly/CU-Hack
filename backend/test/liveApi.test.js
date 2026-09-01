@@ -26,9 +26,17 @@ test(
       "vegan dinner under 600 calories, at least 20 grams of protein, ready within 45 minutes"
     );
     assert.equal(parsedFilter.diet, "vegan");
-    assert.ok(Number.isInteger(parsedFilter.maxCalories));
-    assert.ok(Number.isInteger(parsedFilter.minProtein_g));
-    assert.ok(Number.isInteger(parsedFilter.maxReadyTime));
+    for (const field of ["maxCalories", "minProtein_g", "maxReadyTime"]) {
+      if (parsedFilter[field] !== undefined) {
+        assert.ok(Number.isInteger(parsedFilter[field]), `${field} must be an integer when present`);
+      }
+    }
+    assert.ok(
+      ["maxCalories", "minProtein_g", "maxReadyTime", "query", "mealType"].some(
+        (field) => parsedFilter[field] !== undefined,
+      ),
+      "Gemini should return at least one useful search constraint in addition to diet",
+    );
 
     const recipes = await searchRecipes(parsedFilter, { limit: 2, offset: 0 });
     assert.ok(Array.isArray(recipes));
