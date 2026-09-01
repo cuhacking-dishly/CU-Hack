@@ -56,6 +56,11 @@ calorie, protein, carbohydrate, and preparation-time limits from the user's
 text. Recipe results are checked again after Spoonacular normalization; a
 recipe outside a saved numeric bound, or missing the value needed to verify
 that bound, is not placed in the deck.
+If all Gemini models are unavailable, clear supported diet, cuisine, meal,
+allergy, numeric, high-protein, low-carb, and quick-goal phrases fall back to a
+validated deterministic filter so provider instability does not block the
+recipe journey. Ambiguous goals still return the provider error rather than
+inventing constraints.
 
 Render builds with `npm ci`, waits for `/api/ready`, and deploys `main` only
 after the GitHub quality gate passes. That gate performs locked installs,

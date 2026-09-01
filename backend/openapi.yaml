@@ -93,7 +93,7 @@ paths:
               text: cozy Japanese dessert, no peanuts, under 600 calories
       responses:
         "200":
-          description: The normalized filter parsed by Gemini, with explicit numeric bounds deterministically enforced.
+          description: The normalized filter parsed by Gemini, with explicit bounds deterministically enforced and a bounded deterministic fallback for clear supported goals when Gemini is unavailable.
           content:
             application/json:
               schema:

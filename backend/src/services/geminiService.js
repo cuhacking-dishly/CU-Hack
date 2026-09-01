@@ -279,9 +279,120 @@ function extractExplicitNumericConstraints(text) {
   return constraints;
 }
 
-function applyExplicitNumericConstraints(filter, text) {
-  const explicit = extractExplicitNumericConstraints(text);
-  const merged = { ...filter, ...explicit };
+function extractDeterministicGoalConstraints(text) {
+  const constraints = extractExplicitNumericConstraints(text);
+
+  const dietMappings = [
+    ["gluten free", /\bgluten[- ]free\b/i],
+    ["ketogenic", /\b(?:keto|ketogenic)\b/i],
+    ["lacto-vegetarian", /\blacto[- ]vegetarian\b/i],
+    ["ovo-vegetarian", /\bovo[- ]vegetarian\b/i],
+    ["vegan", /\bvegan\b/i],
+    ["vegetarian", /\bvegetarian\b/i],
+    ["pescetarian", /\bpesc(?:e|a)tarian\b/i],
+    ["paleo", /\bpaleo\b/i],
+    ["primal", /\bprimal\b/i],
+    ["low fodmap", /\blow[- ]fodmap\b/i],
+    ["whole30", /\bwhole[- ]?30\b/i],
+  ];
+  const diet = dietMappings.find(([, pattern]) => pattern.test(text));
+  if (diet) constraints.diet = diet[0];
+
+  const cuisineMappings = [
+    ["african", /\bafrican\b/i],
+    ["asian", /\basian\b/i],
+    ["american", /\b(?:american|u\.?s\.?a?\.? cuisine)\b/i],
+    ["british", /\b(?:british|uk cuisine)\b/i],
+    ["cajun", /\bcajun\b/i],
+    ["caribbean", /\bcaribbean\b/i],
+    ["chinese", /\b(?:chinese|china)\b/i],
+    ["eastern european", /\beastern european\b/i],
+    ["european", /\beuropean\b/i],
+    ["french", /\b(?:french|france)\b/i],
+    ["german", /\b(?:german|germany)\b/i],
+    ["greek", /\b(?:greek|greece)\b/i],
+    ["indian", /\b(?:indian|india)\b/i],
+    ["irish", /\b(?:irish|ireland)\b/i],
+    ["italian", /\b(?:italian|italy)\b/i],
+    ["japanese", /\b(?:japanese|japan|tokyo)\b/i],
+    ["jewish", /\bjewish\b/i],
+    ["korean", /\b(?:korean|korea)\b/i],
+    ["latin american", /\blatin american\b/i],
+    ["mediterranean", /\bmediterranean\b/i],
+    ["mexican", /\b(?:mexican|mexico)\b/i],
+    ["middle eastern", /\bmiddle eastern\b/i],
+    ["nordic", /\b(?:nordic|scandinavian)\b/i],
+    ["southern", /\bsouthern (?:food|cuisine|cooking)\b/i],
+    ["spanish", /\b(?:spanish|spain)\b/i],
+    ["thai", /\b(?:thai|thailand)\b/i],
+    ["vietnamese", /\b(?:vietnamese|vietnam)\b/i],
+  ];
+  const cuisines = cuisineMappings
+    .filter(([, pattern]) => pattern.test(text))
+    .map(([value]) => value);
+  if (cuisines.length > 0) constraints.cuisines = cuisines;
+
+  if (/\b(?:desserts?|sweet treats?|after[- ]dinner treats?)\b/i.test(text)) {
+    constraints.mealType = "dessert";
+  } else if (/\b(?:breakfast|brunch|morning (?:food|meal))\b/i.test(text)) {
+    constraints.mealType = "breakfast";
+  } else if (/\b(?:lunch|dinner|supper|main course|main meal)\b/i.test(text)) {
+    constraints.mealType = "main course";
+  }
+
+  const allergyMappings = [
+    ["dairy", "dairy", "dairy"],
+    ["egg", "eggs?", "eggs"],
+    ["gluten", "gluten", "gluten"],
+    ["grain", "grains?", "grains"],
+    ["peanut", "peanuts?", "peanuts"],
+    ["seafood", "seafood", "seafood"],
+    ["sesame", "sesame", "sesame"],
+    ["shellfish", "shellfish", "shellfish"],
+    ["soy", "soy", "soy"],
+    ["sulfite", "sulfites?", "sulfites"],
+    ["tree nut", "tree nuts?", "tree nuts"],
+    ["wheat", "wheat", "wheat"],
+  ];
+  const intolerances = [];
+  const exclusions = [];
+  for (const [value, ingredientPattern, exclusion] of allergyMappings) {
+    const constraintPattern = new RegExp(
+      `(?:\\b(?:no|without|avoid(?:ing)?|allergic to|allergy to|cannot eat|can't eat)\\s+(?:any\\s+)?${ingredientPattern}\\b|\\b${ingredientPattern}[- ]free\\b|\\b${ingredientPattern}\\s+allerg(?:y|ic)\\b)`,
+      "i"
+    );
+    if (!constraintPattern.test(text)) continue;
+    intolerances.push(value);
+    exclusions.push(exclusion);
+  }
+  if (intolerances.length > 0) constraints.intolerances = intolerances;
+  if (exclusions.length > 0) constraints.excludeIngredients = exclusions;
+
+  if (constraints.minProtein_g === undefined && /\b(?:high[- ]protein|protein[- ]rich)\b/i.test(text)) {
+    constraints.minProtein_g = 30;
+  }
+  if (constraints.maxCarbs_g === undefined && /\b(?:low[- ]carb|cutting carbs?|reduce carbs?)\b/i.test(text)) {
+    constraints.maxCarbs_g = 50;
+  }
+  if (constraints.maxReadyTime === undefined && /\b(?:quick|fast|weeknight)\b/i.test(text)) {
+    constraints.maxReadyTime = 30;
+  }
+
+  return normalizeGoalFilter(constraints);
+}
+
+function mergeUnique(left = [], right = []) {
+  return [...new Set([...left, ...right])];
+}
+
+function applyDeterministicConstraints(filter, text) {
+  const deterministic = extractDeterministicGoalConstraints(text);
+  const merged = { ...filter, ...deterministic };
+  for (const field of ["cuisines", "intolerances", "excludeIngredients"]) {
+    if (filter[field] || deterministic[field]) {
+      merged[field] = mergeUnique(filter[field], deterministic[field]);
+    }
+  }
 
   for (const [minimum, maximum] of [
     ["minCalories", "maxCalories"],
@@ -291,8 +402,11 @@ function applyExplicitNumericConstraints(filter, text) {
     if (merged[minimum] === undefined || merged[maximum] === undefined) continue;
     if (merged[minimum] <= merged[maximum]) continue;
 
-    if (explicit[minimum] !== undefined && explicit[maximum] === undefined) delete merged[maximum];
-    else if (explicit[maximum] !== undefined && explicit[minimum] === undefined) delete merged[minimum];
+    if (deterministic[minimum] !== undefined && deterministic[maximum] === undefined) {
+      delete merged[maximum];
+    } else if (deterministic[maximum] !== undefined && deterministic[minimum] === undefined) {
+      delete merged[minimum];
+    }
   }
 
   return normalizeGoalFilter(merged);
@@ -328,7 +442,7 @@ function normalizeGeminiResponse(response, text) {
     });
   }
 
-  return applyExplicitNumericConstraints(normalizeGoalFilter(parsed), text);
+  return applyDeterministicConstraints(normalizeGoalFilter(parsed), text);
 }
 
 async function parseGoal(rawText) {
@@ -373,6 +487,9 @@ async function parseGoal(rawText) {
       if (abortSignal.aborted || !hasFallback || !shouldTryFallback(error)) break;
     }
   }
+
+  const deterministicFallback = extractDeterministicGoalConstraints(text);
+  if (Object.keys(deterministicFallback).length > 0) return deterministicFallback;
 
   if (lastError instanceof GeminiServiceError) throw lastError;
   if (abortSignal.aborted || isTimeoutError(lastError)) {

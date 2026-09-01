@@ -228,6 +228,78 @@ test("explicit calorie suffixes and an-hour phrasing remain deterministic", asyn
   });
 });
 
+test("clear common goals retain a validated filter when every model is unavailable", async () => {
+  process.env.GEMINI_API_KEY = "test-key";
+  process.env.GEMINI_MODEL = "primary-model";
+  process.env.GEMINI_FALLBACK_MODELS = "fallback-model";
+  const capture = installSdkMock(async () => {
+    throw Object.assign(new Error("provider unavailable"), { status: 503 });
+  });
+  const { parseGoal } = require("../src/services/geminiService");
+
+  assert.deepEqual(
+    await parseGoal("High-protein Italian dinner under 700 calories, no peanuts"),
+    {
+      maxCalories: 700,
+      minProtein_g: 30,
+      cuisines: ["italian"],
+      mealType: "main course",
+      intolerances: ["peanut"],
+      excludeIngredients: ["peanuts"],
+    }
+  );
+  assert.deepEqual(
+    capture.requests.map(({ model }) => model),
+    ["primary-model", "fallback-model"]
+  );
+});
+
+test("clear common goals use the deterministic fallback when the owned deadline expires", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  process.env.GEMINI_TIMEOUT_MS = "100";
+  const controller = new AbortController();
+  t.mock.method(AbortSignal, "timeout", () => {
+    queueMicrotask(() => controller.abort(new DOMException("deadline", "TimeoutError")));
+    return controller.signal;
+  });
+  installSdkMock(
+    (request) =>
+      new Promise((resolve, reject) => {
+        request.config.abortSignal.addEventListener(
+          "abort",
+          () => reject(new Error("SDK request cancelled")),
+          { once: true }
+        );
+      })
+  );
+  const { parseGoal } = require("../src/services/geminiService");
+
+  assert.deepEqual(await parseGoal("quick Italian dinner"), {
+    cuisines: ["italian"],
+    mealType: "main course",
+    maxReadyTime: 30,
+  });
+});
+
+test("deterministic parsing recognizes multiple cultures, diets, meals, and allergy forms", async () => {
+  process.env.GEMINI_API_KEY = "test-key";
+  installSdkMock(async () => ({ text: "{}" }));
+  const { parseGoal } = require("../src/services/geminiService");
+
+  assert.deepEqual(
+    await parseGoal("vegan Chinese or Japanese dessert, shellfish-free, low-carb and quick"),
+    {
+      maxCarbs_g: 50,
+      diet: "vegan",
+      cuisines: ["chinese", "japanese"],
+      mealType: "dessert",
+      maxReadyTime: 30,
+      intolerances: ["shellfish"],
+      excludeIngredients: ["shellfish"],
+    }
+  );
+});
+
 test("parseGoal enforces the production timeout floor over stale hosting configuration", async (t) => {
   process.env.GEMINI_API_KEY = "test-key";
   process.env.GEMINI_TIMEOUT_MS = "30000";
@@ -299,7 +371,7 @@ test("parseGoal maps empty, malformed, and non-object model output to a safe 502
     installSdkMock(async () => ({ text: responseText }));
     const { parseGoal } = require("../src/services/geminiService");
 
-    await assert.rejects(() => parseGoal("vegan"), (error) => {
+    await assert.rejects(() => parseGoal("something tasty"), (error) => {
       assert.equal(error.statusCode, 502);
       assert.equal(error.code, "GEMINI_INVALID_RESPONSE");
       assert.equal(error.publicMessage, "Goal parsing service returned an invalid response");
@@ -317,7 +389,7 @@ test("parseGoal preserves SDK failures as an internal cause behind a safe 502", 
   });
   const { parseGoal } = require("../src/services/geminiService");
 
-  await assert.rejects(() => parseGoal("vegan"), (error) => {
+  await assert.rejects(() => parseGoal("something tasty"), (error) => {
     assert.equal(error.statusCode, 502);
     assert.equal(error.code, "GEMINI_UPSTREAM_ERROR");
     assert.equal(error.publicMessage, "Goal parsing service is temporarily unavailable");
@@ -350,7 +422,7 @@ test("parseGoal uses its owned deadline and maps cancellation to 504", async (t)
   );
   const { parseGoal } = require("../src/services/geminiService");
 
-  await assert.rejects(() => parseGoal("quick dinner"), (error) => {
+  await assert.rejects(() => parseGoal("something tasty"), (error) => {
     assert.equal(capturedTimeout, 100);
     assert.equal(error.statusCode, 504);
     assert.equal(error.code, "GEMINI_TIMEOUT");

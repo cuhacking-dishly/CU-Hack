@@ -54,7 +54,7 @@ Put real provider keys in `.env`. Never put keys in `.env.example`, frontend env
 
 The checked-in example allows a Vite frontend at `http://localhost:5173`. Add other exact frontend origins as a comma-separated list, without paths or trailing slashes.
 
-Goal parsing uses Gemini's `MINIMAL` thinking level because this request is a small, schema-constrained classification task. The backend does not set sampling temperature, following the current Gemini 3.5 generation guidance. Transient provider failures use bounded retries with delays capped at eight seconds. Capacity, quota, retired-model, network, or invalid-output failures can advance once to the configured fallback; the 90-second abort signal remains the overall deadline across every attempt and model.
+Goal parsing uses Gemini's `MINIMAL` thinking level because this request is a small, schema-constrained classification task. The backend does not set sampling temperature, following the current Gemini 3.5 generation guidance. Transient provider failures use bounded retries with delays capped at eight seconds. Capacity, quota, retired-model, network, or invalid-output failures can advance once to the configured fallback; the 90-second abort signal remains the overall deadline across every attempt and model. If every model is unavailable, clear supported diet, cuisine, meal, allergy, numeric, and common “high-protein,” “low-carb,” “quick” constraints form a validated deterministic fallback instead of failing the whole recipe journey. Goals that cannot be safely interpreted by that bounded fallback still receive the normal provider error rather than invented intent.
 
 ## Commands
 
