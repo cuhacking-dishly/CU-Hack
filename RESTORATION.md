@@ -37,6 +37,10 @@ The frontend must receive exactly one public API setting at build time:
 VITE_API_BASE_URL=https://<public-backend-host>/api
 ```
 
+The Vercel project root must remain `frontend`. Its committed `vercel.json`
+rewrites all paths to `index.html`; without that rule, refreshing `/deck`,
+`/liked`, or `/recipe/:id` returns a platform 404 instead of loading the SPA.
+
 ## Release verification
 
 From the repository root on Windows:
@@ -77,4 +81,3 @@ absent. That partial rollout caused the 2026-08-31 production failure.
 - Restoration commit: `7deaf36`
 - Public URL: <https://dishly.brandonjameschoi.com/>
 - Canonical remote: <https://github.com/cuhacking-dishly/CU-Hack>
-
