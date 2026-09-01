@@ -45,7 +45,7 @@ jobs:
         run: npm run verify
       - name: Upload browser diagnostics
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-diagnostics
           path: |

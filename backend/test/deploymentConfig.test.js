@@ -36,4 +36,16 @@ test("GitHub Actions runs the complete deterministic gate on portable Chromium",
   assert.match(workflow, /playwright install chromium --with-deps/);
   assert.match(workflow, /PLAYWRIGHT_CHANNEL: chromium/);
   assert.match(workflow, /npm run verify/);
+  assert.match(workflow, /actions\/upload-artifact@v7/);
+});
+
+test("Playwright starts the development server on Windows and Linux", async () => {
+  const playwrightConfig = await readFile(
+    path.join(repositoryDirectory, "frontend/playwright.config.js"),
+    "utf8"
+  );
+
+  assert.match(playwrightConfig, /process\.platform === "win32" \? "npm\.cmd" : "npm"/);
+  assert.match(playwrightConfig, /command: `\$\{npmCommand\} run dev`/);
+  assert.doesNotMatch(playwrightConfig, /command: "npm\.cmd run dev"/);
 });

@@ -3,6 +3,7 @@ import { defineConfig } from "@playwright/test";
 const requestedBrowserChannel = process.env.PLAYWRIGHT_CHANNEL?.trim();
 const browserChannel =
   requestedBrowserChannel === "chromium" ? undefined : requestedBrowserChannel || "msedge";
+const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -22,7 +23,7 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   webServer: {
-    command: "npm.cmd run dev",
+    command: `${npmCommand} run dev`,
     url: "http://localhost:5173",
     reuseExistingServer: true,
     timeout: 30_000,
