@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useParams } from "../router.jsx";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { getRecipeById } from "../api/client.js";
 import Button from "../components/Button.jsx";
 import BrandLogo from "../components/BrandLogo.jsx";

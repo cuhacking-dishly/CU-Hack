@@ -4,9 +4,6 @@ import { defineConfig } from "@playwright/test";
 const frontendDirectory = fileURLToPath(new URL(".", import.meta.url));
 const repositoryDirectory = fileURLToPath(new URL("..", import.meta.url));
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const requestedBrowserChannel = process.env.PLAYWRIGHT_CHANNEL?.trim();
-const browserChannel =
-  requestedBrowserChannel || (process.platform === "win32" ? "msedge" : undefined);
 const requestedBackendPort = Number(process.env.FULLSTACK_BACKEND_PORT);
 const backendPort =
   Number.isInteger(requestedBackendPort) && requestedBackendPort >= 1 && requestedBackendPort <= 65535
@@ -33,7 +30,7 @@ export default defineConfig({
   use: {
     baseURL: frontendOrigin,
     browserName: "chromium",
-    ...(browserChannel ? { channel: browserChannel } : {}),
+    channel: "msedge",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

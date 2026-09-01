@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "../router.jsx";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearDeckSessions,
@@ -37,7 +37,7 @@ vi.mock("../api/client.js", () => ({
   logSwipe: apiMocks.logSwipe,
 }));
 
-vi.mock("../router.jsx", async (importOriginal) => {
+vi.mock("react-router-dom", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
@@ -182,22 +182,10 @@ const THIRD_RECIPE = {
   title: "Sesame Tempeh Plate",
 };
 
-function recipePage(
-  recipes,
-  {
-    limit = 10,
-    offset = 0,
-    hasMore = false,
-    mode = "exact",
-    canShowClosest = false,
-    message = null,
-    semanticProvider = "ollama",
-  } = {},
-) {
+function recipePage(recipes, { limit = 10, offset = 0, hasMore = false } = {}) {
   return {
     recipes,
     pagination: { limit, offset, count: recipes.length, hasMore },
-    match: { mode, canShowClosest, message, semanticProvider },
   };
 }
 
@@ -270,7 +258,6 @@ describe("SwipeDeckPage", () => {
     expect(apiMocks.getRecipes).toHaveBeenCalledWith(
       "demo-user-1",
       expect.objectContaining({
-        matchMode: "exact",
         signal: expect.any(AbortSignal),
         params: { limit: 10, offset: 0 },
       }),
@@ -308,106 +295,14 @@ describe("SwipeDeckPage", () => {
     );
   });
 
-  it("renders the exact no-results state without inventing cards", async () => {
+  it("renders an honest empty state without inventing cards", async () => {
     apiMocks.getRecipes.mockResolvedValue(recipePage([]));
 
     renderDeck();
 
-    expect(await screen.findByRole("heading", { name: "You cooked too hard!" })).toBeVisible();
-    expect(screen.getByText("No available recipes match your request.")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Show closest recipes" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Set a new goal" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Try a different goal" })).toBeVisible();
+    expect(screen.getByText(/No usable recipes were found for this goal/i)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Like recipe" })).not.toBeInTheDocument();
-  });
-
-  it("loads, labels, and persists closest matches only after explicit confirmation", async () => {
-    const user = userEvent.setup();
-    const closestResponse = deferred();
-    const closestRecipe = {
-      ...FIRST_RECIPE,
-      match: {
-        mode: "closest",
-        score: 0.82,
-        reasons: [
-          "Thai cuisine match",
-          "42g protein is near the requested target",
-        ],
-      },
-    };
-    apiMocks.getRecipes
-      .mockResolvedValueOnce(recipePage([], {
-        canShowClosest: true,
-        message: "No exact matches.",
-      }))
-      .mockReturnValueOnce(closestResponse.promise);
-
-    renderDeck();
-
-    expect(await screen.findByRole("heading", { name: "You cooked too hard!" })).toBeVisible();
-    const closestButton = screen.getByRole("button", { name: "Show closest recipes" });
-    await user.click(closestButton);
-
-    expect(screen.getByRole("button", { name: "Finding closest recipes..." })).toBeDisabled();
-    expect(apiMocks.getRecipes).toHaveBeenLastCalledWith(
-      "demo-user-1",
-      expect.objectContaining({
-        matchMode: "closest",
-        signal: expect.any(AbortSignal),
-        params: { limit: 10, offset: 0 },
-      }),
-    );
-
-    await act(async () => closestResponse.resolve(recipePage([closestRecipe], {
-      mode: "closest",
-      message: "Showing the nearest eligible recipes.",
-    })));
-
-    expect(await screen.findByRole("heading", { name: "Swipe your closest matches" })).toBeVisible();
-    expect(screen.getByLabelText("Closest recipe results")).toHaveTextContent(
-      "allergy and vegan requirements remain applied",
-    );
-    expect(screen.getByText("Why it's close")).toBeVisible();
-    expect(screen.getByText("Thai cuisine match")).toBeVisible();
-    expect(screen.getByText("42g protein is near the requested target")).toBeVisible();
-    expect(readDeckSession("demo-user-1", GOAL_UPDATED_AT)).toMatchObject({
-      match: { mode: "closest", canShowClosest: false },
-    });
-  });
-
-  it("keeps the exact empty state available when the closest request fails", async () => {
-    const user = userEvent.setup();
-    apiMocks.getRecipes
-      .mockResolvedValueOnce(recipePage([], { canShowClosest: true }))
-      .mockRejectedValueOnce({
-        response: { data: { error: "Closest search is warming up." } },
-      });
-
-    renderDeck();
-    await user.click(await screen.findByRole("button", { name: "Show closest recipes" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("Closest search is warming up.");
-    expect(screen.getByRole("heading", { name: "You cooked too hard!" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Show closest recipes" })).toBeEnabled();
-  });
-
-  it("does not offer another fallback when the closest deck is empty", async () => {
-    const user = userEvent.setup();
-    apiMocks.getRecipes
-      .mockResolvedValueOnce(recipePage([], { canShowClosest: true }))
-      .mockResolvedValueOnce(recipePage([], {
-        mode: "closest",
-        canShowClosest: true,
-        message: "No eligible nearby recipes were found.",
-      }));
-
-    renderDeck();
-    await user.click(await screen.findByRole("button", { name: "Show closest recipes" }));
-
-    expect(
-      await screen.findByRole("heading", { name: "No closest recipes available" }),
-    ).toBeVisible();
-    expect(screen.getByText("No eligible nearby recipes were found.")).toBeVisible();
-    expect(screen.queryByRole("button", { name: /closest recipes/i })).not.toBeInTheDocument();
   });
 
   it("waits for left-swipe acknowledgement before advancing and persists progress", async () => {

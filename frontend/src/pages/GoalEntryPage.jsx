@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "../router.jsx";
+import { useLocation, useNavigate } from "react-router-dom";
 import { parseGoal, saveGoal } from "../api/client.js";
 import BrandLogo from "../components/BrandLogo.jsx";
 import { USER_ID } from "../constants.js";

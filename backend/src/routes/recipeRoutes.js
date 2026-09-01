@@ -1,11 +1,10 @@
 const express = require("express");
 
-const { getRecipeById, searchRecipePage } = require("../services/retrievalService");
-const { getGoal, getSwipes } = require("../store");
+const { getRecipeById, searchRecipePage } = require("../services/spoonacularService");
+const { getGoal } = require("../store/memoryStore");
 const {
   USER_ID_MAX_LENGTH,
   asyncRoute,
-  createHttpError,
   parseIntegerQuery,
   requireBoundedString,
   requirePositiveRecipeId,
@@ -13,17 +12,6 @@ const {
 } = require("./routeUtils");
 
 const router = express.Router();
-
-function parseMatchMode(value) {
-  if (value === undefined) return "exact";
-
-  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
-  if (normalized !== "exact" && normalized !== "closest") {
-    throw createHttpError(400, "matchMode must be exact or closest");
-  }
-
-  return normalized;
-}
 
 router.get(
   "/recipes",
@@ -44,20 +32,16 @@ router.get(
       max: 900,
       defaultValue: 0,
     });
-    const matchMode = parseMatchMode(requireSingleQueryValue(req.query, "matchMode"));
-    const goal = await getGoal(userId);
-    const excludedRecipeIds = goal
-      ? (await getSwipes(userId))
-          .filter((swipe) => swipe.goalUpdatedAt === goal.updatedAt)
-          .map((swipe) => swipe.recipeId)
-      : [];
-    const page = await searchRecipePage(goal, {
+    const goal = getGoal(userId);
+    const { recipes, hasMore } = await searchRecipePage(goal?.parsedFilter || {}, {
       limit,
       offset,
-      matchMode,
-      excludedRecipeIds,
     });
-    return res.json(page);
+
+    return res.json({
+      recipes,
+      pagination: { limit, offset, count: recipes.length, hasMore },
+    });
   })
 );
 

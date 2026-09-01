@@ -1,10 +1,5 @@
 import { defineConfig } from "@playwright/test";
 
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const requestedBrowserChannel = process.env.PLAYWRIGHT_CHANNEL?.trim();
-const browserChannel =
-  requestedBrowserChannel || (process.platform === "win32" ? "msedge" : undefined);
-
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,
@@ -17,13 +12,13 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:5173",
     browserName: "chromium",
-    ...(browserChannel ? { channel: browserChannel } : {}),
+    channel: "msedge",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },
   webServer: {
-    command: `${npmCommand} run dev`,
+    command: "npm.cmd run dev",
     url: "http://localhost:5173",
     reuseExistingServer: true,
     timeout: 30_000,

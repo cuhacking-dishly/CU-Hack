@@ -64,8 +64,6 @@ async function installApiFixtures(
   page,
   {
     recipes = [ALPHA_RECIPE, BETA_RECIPE],
-    closestRecipes = recipes,
-    canShowClosest = false,
     details = new Map([
       [ALPHA_RECIPE.id, ALPHA_RECIPE],
       [BETA_RECIPE.id, BETA_RECIPE],
@@ -124,23 +122,14 @@ async function installApiFixtures(
     if (method === "GET" && path === "/api/recipes") {
       const limit = Number(url.searchParams.get("limit"));
       const offset = Number(url.searchParams.get("offset"));
-      const matchMode = url.searchParams.get("matchMode");
-      const selectedRecipes = matchMode === "closest" ? closestRecipes : recipes;
       observed.recipeQueries.push({
         userId: url.searchParams.get("userId"),
         limit,
-        matchMode,
         offset,
       });
       await fulfillJson(route, {
-        recipes: selectedRecipes,
-        pagination: { limit, offset, count: selectedRecipes.length, hasMore: false },
-        match: {
-          mode: matchMode,
-          canShowClosest: matchMode === "exact" && canShowClosest,
-          message: null,
-          semanticProvider: "ollama",
-        },
+        recipes,
+        pagination: { limit, offset, count: recipes.length, hasMore: false },
       });
       return;
     }
@@ -238,7 +227,7 @@ test("completes goal entry, opens the exact liked card, and renders its full nut
   ]);
   expect(observed.detailIds).toEqual([]);
   expect(observed.recipeQueries).toEqual([
-    { userId: "demo-user-1", limit: 10, matchMode: "exact", offset: 0 },
+    { userId: "demo-user-1", limit: 10, offset: 0 },
   ]);
 
   expect(observed.recipeQueries).toHaveLength(1);
@@ -246,47 +235,6 @@ test("completes goal entry, opens the exact liked card, and renders its full nut
   await page.reload();
   await expect(page.getByRole("status")).toContainText("Match 2: Ginger Tofu Plate");
   expect(observed.recipeQueries).toHaveLength(1);
-});
-
-test("offers closest recipes after an exact miss and clearly labels the resulting deck", async ({
-  page,
-}) => {
-  const closestRecipe = {
-    ...ALPHA_RECIPE,
-    matchReasons: ["Cuisine is nearby", "Protein is near your target"],
-  };
-  const observed = await installApiFixtures(page, {
-    recipes: [],
-    closestRecipes: [closestRecipe],
-    canShowClosest: true,
-  });
-
-  await page.goto("/deck");
-  await expect(page.getByRole("heading", { name: "You cooked too hard!" })).toBeVisible();
-  await expect(page.getByText("No available recipes match your request.")).toBeVisible();
-
-  await page.getByRole("button", { name: "Show closest recipes" }).click();
-
-  await expect(page.getByRole("heading", { name: "Swipe your closest matches" })).toBeVisible();
-  await expect(page.getByLabel("Closest recipe results")).toContainText(
-    "allergy and vegan requirements remain applied",
-  );
-  await expect(page.getByRole("heading", { name: "Why it's close" })).toBeVisible();
-  await expect(page.getByText("Cuisine is nearby")).toBeVisible();
-  await expectNoHorizontalOverflow(page);
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByLabel("Closest recipe results")).toBeVisible();
-  await expectNoHorizontalOverflow(page);
-
-  expect(observed.recipeQueries).toEqual([
-    { userId: "demo-user-1", limit: 10, matchMode: "exact", offset: 0 },
-    { userId: "demo-user-1", limit: 10, matchMode: "closest", offset: 0 },
-  ]);
-
-  await page.reload();
-  await expect(page.getByRole("heading", { name: "Swipe your closest matches" })).toBeVisible();
-  expect(observed.recipeQueries).toHaveLength(2);
 });
 
 test("builds a deck from nutrition targets without requiring a typed goal", async ({ page }) => {

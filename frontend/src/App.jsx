@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
-import { BrowserRouter, Route, Routes, useLocation } from "./router.jsx";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import RouteEffects from "./components/RouteEffects.jsx";
 import GoalEntryPage from "./pages/GoalEntryPage.jsx";
 import LikedRecipesPage from "./pages/LikedRecipesPage.jsx";

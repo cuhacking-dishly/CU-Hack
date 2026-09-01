@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocation } from "../router.jsx";
+import { useLocation } from "react-router-dom";
 
 function getRouteTitle() {
   return "dishly";

@@ -6,7 +6,7 @@ const DEMO_USER_ID = "demo-user-1";
 const DEMO_FAVORITE_RECIPE = {
   id: "1697679",
   title: "5-minute Ricotta Garlic Herb Dip",
-  image: "https://maplewoodroad.com/wp-content/uploads/2020/01/Ricotta-Dip-3.jpg",
+  image: "https://img.spoonacular.com/recipes/1697679-556x370.jpg",
   readyInMinutes: 5,
   servings: 2,
   calories: 537,

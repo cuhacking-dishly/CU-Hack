@@ -220,7 +220,7 @@ test("strict normalization rejects invalid roots and oversized ingredient arrays
   );
 });
 
-test("the local parser response schema matches the canonical filter contract", () => {
+test("the Gemini response schema matches the canonical filter contract", () => {
   assert.deepEqual(Object.keys(GOAL_FILTER_JSON_SCHEMA.properties), GOAL_FILTER_FIELDS);
   assert.equal(GOAL_FILTER_JSON_SCHEMA.additionalProperties, false);
   assert.deepEqual(GOAL_FILTER_JSON_SCHEMA.properties.diet.enum, ALLOWED_DIETS);

@@ -6,20 +6,11 @@ function clone(value) {
   return structuredClone(value);
 }
 
-function nextGoalVersion(userId) {
-  const previousTimestamp = Date.parse(goals.get(userId)?.updatedAt || "");
-  const now = Date.now();
-  const timestamp = Number.isFinite(previousTimestamp) && now <= previousTimestamp
-    ? previousTimestamp + 1
-    : now;
-  return new Date(timestamp).toISOString();
-}
-
 function setGoal(userId, rawText, parsedFilter) {
   goals.set(userId, {
     rawText,
     parsedFilter: clone(parsedFilter),
-    updatedAt: nextGoalVersion(userId),
+    updatedAt: new Date().toISOString(),
   });
 }
 
@@ -28,18 +19,14 @@ function getGoal(userId) {
   return goal ? clone(goal) : null;
 }
 
-function addSwipe(userId, recipeId, direction, goalUpdatedAt) {
+function addSwipe(userId, recipeId, direction) {
   const userSwipes = swipesByUser.get(userId) || [];
-  const swipe = {
+  userSwipes.push({
     userId,
     recipeId,
     direction,
     timestamp: new Date().toISOString(),
-  };
-  if (typeof goalUpdatedAt === "string" && goalUpdatedAt.trim() !== "") {
-    swipe.goalUpdatedAt = goalUpdatedAt.trim();
-  }
-  userSwipes.push(swipe);
+  });
 
   if (userSwipes.length > MAX_SWIPES_PER_USER) {
     userSwipes.splice(0, userSwipes.length - MAX_SWIPES_PER_USER);

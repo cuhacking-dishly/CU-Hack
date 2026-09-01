@@ -17,7 +17,8 @@ const EXPECTED_FILTER = {
 };
 
 const serverPath = require.resolve("../src/server");
-const retrievalServicePath = require.resolve("../src/services/retrievalService");
+const geminiServicePath = require.resolve("../src/services/geminiService");
+const spoonacularServicePath = require.resolve("../src/services/spoonacularService");
 const memoryStorePath = require.resolve("../src/store/memoryStore");
 const dotenvPath = require.resolve("dotenv");
 
@@ -70,34 +71,22 @@ async function parseGoal(text) {
   return structuredClone(EXPECTED_FILTER);
 }
 
-async function searchRecipePage(goal, options) {
-  assert.deepEqual(goal.parsedFilter, EXPECTED_FILTER);
+async function searchRecipePage(filter, options) {
+  assert.deepEqual(filter, EXPECTED_FILTER);
   providerCalls.searchRecipes.push({
-    filter: structuredClone(goal.parsedFilter),
-    options: { limit: options.limit, offset: options.offset },
+    filter: structuredClone(filter),
+    options: structuredClone(options),
   });
 
   const pageRecipes = recipes.slice(options.offset, options.offset + options.limit);
   return {
     recipes: structuredClone(pageRecipes),
-    pagination: {
-      limit: options.limit,
-      offset: options.offset,
-      count: pageRecipes.length,
-      hasMore: options.offset + options.limit < recipes.length,
-    },
-    match: {
-      mode: options.matchMode,
-      canShowClosest: false,
-      message: null,
-      totalCandidates: recipes.length,
-      semanticProvider: "full-stack-fixture",
-    },
+    hasMore: options.offset + options.limit < recipes.length,
   };
 }
 
 async function searchRecipes(filter, options) {
-  return (await searchRecipePage({ parsedFilter: filter }, options)).recipes;
+  return (await searchRecipePage(filter, options)).recipes;
 }
 
 async function getRecipeById(id) {
@@ -107,10 +96,9 @@ async function getRecipeById(id) {
   return structuredClone(recipe);
 }
 
-installModuleStub(retrievalServicePath, {
-  checkRetrievalReadiness: async () => true,
+installModuleStub(geminiServicePath, { parseGoal });
+installModuleStub(spoonacularServicePath, {
   getRecipeById,
-  parseGoal,
   searchRecipePage,
   searchRecipes,
 });

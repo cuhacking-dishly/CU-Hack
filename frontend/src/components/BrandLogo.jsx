@@ -1,4 +1,4 @@
-import { Link } from "../router.jsx";
+import { Link } from "react-router-dom";
 import "./BrandLogo.css";
 
 /**

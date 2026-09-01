@@ -1,6 +1,6 @@
 const express = require("express");
 
-const { addSwipe, getGoal } = require("../store");
+const { addSwipe } = require("../store/memoryStore");
 const {
   USER_ID_MAX_LENGTH,
   asyncRoute,
@@ -17,7 +17,7 @@ function isMissingString(value) {
 
 router.post(
   "/swipe",
-  asyncRoute(async (req, res) => {
+  asyncRoute((req, res) => {
     const { userId, recipeId, direction } = req.body || {};
 
     if (isMissingString(userId) || isMissingString(recipeId)) {
@@ -34,13 +34,7 @@ router.post(
       throw createHttpError(400, "direction must be left or right");
     }
 
-    const goal = await getGoal(normalizedUserId);
-    await addSwipe(
-      normalizedUserId,
-      normalizedRecipeId,
-      normalizedDirection,
-      goal?.updatedAt
-    );
+    addSwipe(normalizedUserId, normalizedRecipeId, normalizedDirection);
     return res.json({ success: true });
   })
 );
