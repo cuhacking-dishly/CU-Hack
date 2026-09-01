@@ -1,8 +1,8 @@
 # Recipe Match Backend
 
-Node/Express API for Recipe Match. It turns a natural-language food goal into a validated filter with Gemini, searches Spoonacular, normalizes recipe and nutrition data for the frontend, and records goals and swipes in memory.
+Node/Express API for Recipe Match. It turns a natural-language food goal into a validated filter with Gemini, searches Spoonacular, normalizes recipe and nutrition data for the frontend, records guest goals/swipes in memory, and exposes an optional authenticated recipe library backed by Supabase.
 
-The API has no database and no authentication. All goals and swipes are process-local demo data and are erased whenever the server restarts.
+Guest mode has no database or authentication dependency. Goals and swipes are process-local demo data and are erased whenever the server restarts. If the optional free Supabase variables are configured, bearer sessions unlock durable, per-user recipes, notes, ratings, collections, export, and account deletion.
 
 ## Requirements
 
@@ -51,6 +51,9 @@ Put real provider keys in `.env`. Never put keys in `.env.example`, frontend env
 | `SPOONACULAR_API_KEY` | For recipes | None | Server-side Spoonacular API key. |
 | `SPOONACULAR_TIMEOUT_MS` | No | `8000` | Spoonacular timeout in milliseconds. Valid range `100..120000`; invalid values use the default. |
 | `CORS_ORIGINS` | No | Permissive | Comma-separated exact browser origins. Blank, unset, or any `*` allows every origin. |
+| `SUPABASE_URL` | For accounts | None | HTTPS project URL for the optional free Supabase account layer. |
+| `SUPABASE_PUBLISHABLE_KEY` | For accounts | None | Public project key used to validate sessions and make RLS-constrained data requests. Safe to return to the browser. |
+| `SUPABASE_SECRET_KEY` | For account deletion | None | Server-only key used only to delete the exact authenticated Auth user. Never expose it to the frontend. |
 
 The checked-in example allows a Vite frontend at `http://localhost:5173`. Add other exact frontend origins as a comma-separated list, without paths or trailing slashes.
 
@@ -75,7 +78,7 @@ The default base URL is `http://localhost:3000/api`.
 - Send request bodies as `application/json`.
 - All responses, including errors and unknown routes, are JSON.
 - Successful requests return `200 OK`.
-- Strings are trimmed before use. `userId` is a caller-supplied demo identifier, not an authenticated identity.
+- Guest goal/swipe strings are trimmed before use. Their `userId` remains a caller-supplied demo identifier. Protected account routes ignore caller identity and derive the user exclusively from a verified bearer session.
 - Repeated scalar query parameters, such as two `userId` values, are rejected.
 - Request bodies are limited to 1 MiB.
 - Every `/api` response sets `Cache-Control: no-store`; frontend code should keep its own deliberate state rather than relying on HTTP caching.
@@ -97,6 +100,7 @@ documented readiness shape with status `503` rather than an error envelope.
 | --- | --- |
 | `400` | Invalid body, query, path parameter, filter, or JSON syntax. |
 | `403` | Browser origin is not allowed by `CORS_ORIGINS`. |
+| `401` | A protected account route is missing a valid bearer session. |
 | `404` | Recipe or API route was not found. |
 | `413` | JSON request body is larger than 1 MiB. |
 | `500` | Unexpected backend failure. Internal details are not returned. |
@@ -198,6 +202,26 @@ The accepted swipe values are:
 `direction` is exactly `left` or `right` after trimming. `recipeId` is a canonical positive JavaScript-safe integer string with no leading zeroes. The in-memory record also receives a server-generated `timestamp`; at most the latest 1,000 swipes are retained per user. No route exposes swipe history.
 
 ## Endpoints
+
+### Optional accounts and saved recipes
+
+`GET /api/auth/config` is public and returns either `{ "enabled": false }` or the Supabase project URL and publishable key. It never returns the secret key. All remaining account routes require `Authorization: Bearer <access-token>` and rely on database row-level security in addition to the backend identity check.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/me` | Bounded public profile fields for the active session. |
+| `GET /api/saved-recipes` | Paginated private recipe snapshots, newest first. |
+| `PUT /api/saved-recipes/:recipeId` | Idempotently save one validated Spoonacular recipe snapshot. |
+| `POST /api/saved-recipes/import` | Idempotently import at most 200 guest recipes after first sign-in. |
+| `PATCH /api/saved-recipes/:recipeId` | Update a private note (2,000 characters max) and/or 1–5 rating. |
+| `DELETE /api/saved-recipes/:recipeId` | Remove one saved recipe and cascading memberships. |
+| `GET/POST /api/collections` | List or create private collections. |
+| `PATCH/DELETE /api/collections/:id` | Rename/update or remove a private collection. |
+| `PUT/DELETE /api/collections/:id/recipes/:recipeId` | Add/remove a saved recipe membership. |
+| `GET /api/account/export` | Download all saved account data as JSON. |
+| `DELETE /api/account` | Permanently delete the authenticated account after an exact `DELETE` confirmation. |
+
+Recipe snapshots are sanitized and bounded before storage, so a saved recipe remains usable if Spoonacular is temporarily unavailable. The normal data path uses the user's access token, not the server secret, so Supabase RLS remains authoritative.
 
 ### `GET /api/health`
 

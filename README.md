@@ -1,6 +1,6 @@
 # Dishly Recipe Match
 
-Dishly Recipe Match is a full-stack recipe-discovery app. Describe what you want to eat, refine the nutrition or dietary filters, then browse a swipeable recipe deck. The Express backend uses Gemini to interpret goals and Spoonacular to find recipes; the React frontend displays and saves each swipe.
+Dishly Recipe Match is a full-stack recipe-discovery app. Describe what you want to eat, refine the nutrition or dietary filters, then browse a swipeable recipe deck. The Express backend uses Gemini to interpret goals and Spoonacular to find recipes. Guest mode is the default; an optional free Supabase account lets people privately sync recipes, notes, ratings, and collections.
 
 This guide is the complete starting point for a fresh clone.
 
@@ -11,6 +11,7 @@ This guide is the complete starting point for a fresh clone.
 - [Node.js 24 or later](https://nodejs.org/) (includes npm)
 - npm 11 or later
 - A Gemini API key and a Spoonacular API key to use the live app
+- A free Supabase project only if you want optional cross-device accounts
 - Microsoft Edge for the default local Playwright run, or Playwright Chromium for portable/CI runs
 
 Confirm Node and npm are available:
@@ -48,6 +49,8 @@ Add your values to these lines in `backend/.env`:
 GEMINI_API_KEY=your_gemini_key
 SPOONACULAR_API_KEY=your_spoonacular_key
 ```
+
+Dishly works without an account service. To enable the optional top-right sign-in, create a free Supabase project, run the committed migration in `supabase/migrations`, and add its project URL, publishable key, and server-only secret key to the matching `SUPABASE_*` variables. The publishable key is intentionally returned to the browser; the secret key never is and is used only for exact authenticated account deletion. See [Account setup](./docs/ACCOUNTS.md).
 
 Keep `backend/.env` private. It is ignored by Git and must never be committed. Do not put provider keys in `frontend/.env` or any `VITE_*` variable: Vite embeds those variables in browser code.
 
@@ -102,10 +105,11 @@ frontend/       React/Vite interface, component tests, and Playwright tests
 backend/openapi.yaml  Complete API contract
 ```
 
-The backend keeps goals and swipe history in memory for this hackathon demo. Restarting it clears that data. It has no authentication and is not configured as a persistent production service.
+The backend keeps guest goals and swipe history in memory for this hackathon demo. Restarting it clears those two pieces of guest state. Guest liked recipes remain in the current browser tab. Signed-in saved recipes and their metadata are durable in Supabase and isolated with row-level security.
 
 ## More detail
 
 - [Backend README](./backend/README.md): API endpoints, configuration, error handling, test commands, and OpenAPI contract.
 - [Frontend README](./frontend/README.md): UI behavior, frontend tests, responsive behavior, and deployment routing requirement.
 - [Frontend design notes](./frontend/DESIGN.md): shared visual components and motion-system constraints.
+- [Optional account setup](./docs/ACCOUNTS.md): free-tier Supabase setup, OAuth redirects, migration, deployment variables, and security checks.

@@ -1,8 +1,11 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it } from "vitest";
 import { USER_ID } from "../constants.js";
+import { AuthContext, guestValue } from "../auth/AuthContext.jsx";
+import { server } from "../test/server.js";
 import { addLikedRecipe, clearLikedRecipes } from "../utils/likedRecipes.js";
 import LikedRecipesPage from "./LikedRecipesPage.jsx";
 
@@ -26,16 +29,17 @@ const RECIPE_B = {
   macros: { protein_g: 31, carbs_g: 55, fat_g: 18 },
 };
 
-function renderLikedPage() {
-  return render(
+function renderLikedPage(auth) {
+  const routes = (
     <MemoryRouter initialEntries={["/liked"]}>
       <Routes>
         <Route path="/liked" element={<LikedRecipesPage />} />
         <Route path="/deck" element={<h1>Deck destination</h1>} />
         <Route path="/recipe/:id" element={<h1>Recipe detail destination</h1>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+  return render(auth ? <AuthContext.Provider value={{ ...guestValue, ...auth }}>{routes}</AuthContext.Provider> : routes);
 }
 
 describe("LikedRecipesPage", () => {
@@ -129,5 +133,62 @@ describe("LikedRecipesPage", () => {
     await user.click(screen.getByRole("button", { name: "Back to deck" }));
 
     expect(screen.getByRole("heading", { name: "Deck destination" })).toBeInTheDocument();
+  });
+
+  it("loads, searches, annotates, organizes, and removes the signed-in cloud library", async () => {
+    const user = userEvent.setup();
+    const requests = [];
+    const cloudRecipe = { ...RECIPE_A, notes: "Bright flavour", rating: 4, diets: ["gluten free"] };
+    server.use(
+      http.get("http://localhost:3000/api/saved-recipes", ({ request }) => {
+        requests.push(request.headers.get("authorization"));
+        return HttpResponse.json({ recipes: [cloudRecipe, { ...RECIPE_B, notes: "", rating: null, diets: [] }], pagination: { count: 2 } });
+      }),
+      http.get("http://localhost:3000/api/collections", () => HttpResponse.json({ collections: [{ id: "22222222-2222-4222-8222-222222222222", name: "Dinner", description: "" }] })),
+      http.patch("http://localhost:3000/api/saved-recipes/:id", async ({ request }) => HttpResponse.json({ ...cloudRecipe, ...(await request.json()) })),
+      http.post("http://localhost:3000/api/collections", async ({ request }) => HttpResponse.json({ id: "new", ...(await request.json()) }, { status: 201 })),
+      http.put("http://localhost:3000/api/collections/:collectionId/recipes/:recipeId", () => new HttpResponse(null, { status: 204 })),
+      http.delete("http://localhost:3000/api/saved-recipes/:id", () => new HttpResponse(null, { status: 204 })),
+    );
+
+    renderLikedPage({ authReady: true, accountAvailable: true, accessToken: "cloud-token", user: { id: "user-1" }, migrationStatus: "idle" });
+    expect(await screen.findByRole("heading", { name: "Saved Recipes" })).toBeVisible();
+    expect(await screen.findByText("Synced privately to your account")).toBeVisible();
+    expect(requests).toContain("Bearer cloud-token");
+
+    await user.type(screen.getByRole("searchbox", { name: "Search your recipes" }), "ginger");
+    expect(screen.getByRole("link", { name: /Ginger Tofu Plate/ })).toBeVisible();
+    expect(screen.queryByRole("link", { name: /Lemon Chicken Bowl/ })).not.toBeInTheDocument();
+    await user.clear(screen.getByRole("searchbox", { name: "Search your recipes" }));
+
+    const card = screen.getByRole("link", { name: /Lemon Chicken Bowl/ }).closest(".liked-card-shell");
+    await user.clear(within(card).getByLabelText("Private notes"));
+    await user.type(within(card).getByLabelText("Private notes"), "Make again");
+    await user.selectOptions(within(card).getByLabelText("My rating"), "5");
+    await user.click(within(card).getByRole("button", { name: "Save notes" }));
+    expect(await within(card).findByText("Saved")).toBeVisible();
+    await user.selectOptions(within(card).getByLabelText("Add to collection"), "22222222-2222-4222-8222-222222222222");
+    await user.click(within(card).getByRole("button", { name: "Add" }));
+    expect(await within(card).findByText("Added to collection")).toBeVisible();
+
+    await user.type(screen.getByPlaceholderText("Weeknight favourites"), "Lunches");
+    await user.click(screen.getByRole("button", { name: "Create" }));
+    expect(await screen.findByText("Collection created")).toBeVisible();
+
+    await user.click(within(card).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(screen.queryByRole("link", { name: /Lemon Chicken Bowl/ })).not.toBeInTheDocument());
+  });
+
+  it("shows signed-in loading, empty-search, and request-error states", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get("http://localhost:3000/api/saved-recipes", () => HttpResponse.json({ recipes: [RECIPE_A] })),
+      http.get("http://localhost:3000/api/collections", () => HttpResponse.json({ collections: [] })),
+    );
+    renderLikedPage({ authReady: true, accessToken: "token", user: { id: "u" }, migrationStatus: "idle" });
+    expect(screen.getByText(/loading your private recipe library/i)).toBeVisible();
+    await screen.findByRole("link", { name: /Lemon Chicken Bowl/ });
+    await user.type(screen.getByRole("searchbox"), "does not exist");
+    expect(screen.getByText(/no saved recipes match/i)).toBeVisible();
   });
 });

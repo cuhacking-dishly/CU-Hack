@@ -35,6 +35,7 @@ test("runs the complete browser flow through the real Express API", async ({ pag
     }
 
     const url = new URL(browserRequest.url());
+    if (url.pathname === "/api/auth/config") return;
     browserApiCalls.push({
       method: browserRequest.method(),
       pathname: url.pathname,

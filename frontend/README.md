@@ -2,7 +2,7 @@
 
 Recipe Match turns a natural-language food goal into a swipeable recipe deck. The interface keeps calories, protein, carbohydrates, and fat visible while the user decides, acknowledges every completed swipe through the backend, and opens the exact accepted recipe on a detail page.
 
-This directory contains the React frontend only. Recipe parsing, saved goals, recipe-provider requests, and API keys belong to the backend.
+This directory contains the React frontend only. Recipe parsing, saved goals, recipe-provider requests, and secret keys belong to the backend. The optional Supabase publishable configuration is discovered from the backend at runtime, so the same frontend build supports both guest-only and account-enabled deployments.
 
 ## Requirements
 
@@ -29,7 +29,7 @@ The frontend calls `http://localhost:3000/api` by default. A different backend c
 VITE_API_BASE_URL=http://localhost:3000/api
 ```
 
-Every `VITE_` value is embedded in browser code. Never place Gemini, Spoonacular, ElevenLabs, or other secrets in a frontend environment file.
+Every `VITE_` value is embedded in browser code. Never place Gemini, Spoonacular, the Supabase secret key, or other secrets in a frontend environment file.
 
 ## Commands
 
@@ -55,8 +55,9 @@ The browser suite defaults to the Microsoft Edge installation already present on
 | `/` | Goal entry | Captures a typed craving or filter-only goal. Its full-width, search-attached Recipe filters popover turns calorie, protein, and carbohydrate entries into a ±20% per-serving range; accepts free-form culture and allergy language, and offers Breakfast/Lunch & dinner/Dessert. Culture/allergy text is interpreted by Gemini, including multiple culture alternatives and non-standard ingredient allergies. Loading this route does not make an API request. |
 | `/deck` | Swipe deck | Requires a saved goal, restores this tab's current deck when possible, and fetches additional recipe pages as needed. |
 | `/recipe/:id` | Recipe detail | Reuses the exact accepted Recipe DTO during in-app navigation; direct links fetch that numeric recipe ID. |
+| `/liked` | Recipe library | Shows tab-local liked recipes for guests or the authenticated private cloud library with search, notes, ratings, and collections. |
 
-The demo user is fixed as `demo-user-1` in `src/constants.js`. There is no authentication. Deck state is cached in `sessionStorage` for the current browser tab under the demo user and the saved goal's `updatedAt` value. A successful new goal clears older deck snapshots. With working session storage, returning from an accepted recipe or refreshing `/deck` resumes at the next unreviewed card without repeating the recipe search. If browser storage is blocked, full, or corrupt, a runtime memory fallback still preserves in-app detail-to-deck returns; a full page refresh then rebuilds the deck because browser persistence was unavailable.
+Guest mode remains the default and uses the fixed `demo-user-1` identifier for goal/deck state. The top-right Sign in control is optional and never blocks discovery. It offers Google OAuth and email magic links—no app-managed passwords. On first sign-in, guest liked recipes are idempotently imported; they are cleared locally only after the cloud confirms success. Signed-in right swipes save to the private cloud library. Deck state is still cached in `sessionStorage` for the current browser tab under the demo user and the saved goal's `updatedAt` value. A successful new goal clears older deck snapshots.
 
 Recipe IDs are canonical positive JavaScript-safe integer strings, matching Spoonacular and the backend contract. Both left and right actions wait for `POST /swipe` to succeed before progress is advanced. A failed swipe returns the same card and can be retried.
 
@@ -89,6 +90,8 @@ All network access is centralized in `src/api/client.js` and uses the backend `/
 - `GET /recipes?userId=...&limit=10&offset=...`
 - `GET /recipes/:id`
 - `POST /swipe`
+- `GET /auth/config` and `GET /me`
+- `/saved-recipes`, `/collections`, and `/account` protected resources
 
 Recipe pages include `{ recipes, pagination: { limit, offset, count, hasMore } }`. `count` describes the current normalized page, while `hasMore` controls whether the deck should request another page. API helpers return `response.data`, accept an optional Axios request config for cancellation, and let failures propagate to page-level error handling. Their 100-second client timeout is deliberately longer than the backend's 90-second Gemini deadline. The frontend never calls Gemini, Spoonacular, or another recipe provider directly.
 
@@ -117,6 +120,8 @@ The interface reminds people to inspect ingredient labels before eating.
 ```text
 src/
   api/client.js              Backend API boundary
+  auth/AuthContext.jsx       Optional Supabase session and guest import
+  components/AccountControl.* Top-right sign-in and account controls
   components/Button.*         Shared motion-powered button (variants + sizes)
   components/RouteEffects.* Route title, focus, and scroll management
   pages/GoalEntryPage.*      Goal capture and save flow

@@ -67,3 +67,102 @@ export async function logSwipe(userId, recipeId, direction, config = {}) {
   );
   return response.data;
 }
+
+export async function getAuthConfig(config = {}) {
+  const response = await client.get("/auth/config", config);
+  return response.data;
+}
+
+export async function getMe(accessToken, config = {}) {
+  const response = await client.get("/me", withAccessToken(accessToken, config));
+  return response.data;
+}
+
+export async function getSavedRecipes(accessToken, config = {}) {
+  const response = await client.get("/saved-recipes", withAccessToken(accessToken, config));
+  return response.data;
+}
+
+export async function saveCloudRecipe(accessToken, recipe, config = {}) {
+  const response = await client.put(
+    `/saved-recipes/${encodeURIComponent(recipe.id)}`,
+    { recipe },
+    withAccessToken(accessToken, config),
+  );
+  return response.data;
+}
+
+export async function importCloudRecipes(accessToken, recipes, config = {}) {
+  const response = await client.post(
+    "/saved-recipes/import",
+    { recipes },
+    withAccessToken(accessToken, config),
+  );
+  return response.data;
+}
+
+export async function updateCloudRecipe(accessToken, recipeId, changes, config = {}) {
+  const response = await client.patch(
+    `/saved-recipes/${encodeURIComponent(recipeId)}`,
+    changes,
+    withAccessToken(accessToken, config),
+  );
+  return response.data;
+}
+
+export async function removeCloudRecipe(accessToken, recipeId, config = {}) {
+  await client.delete(
+    `/saved-recipes/${encodeURIComponent(recipeId)}`,
+    withAccessToken(accessToken, config),
+  );
+}
+
+export async function getCollections(accessToken, config = {}) {
+  const response = await client.get("/collections", withAccessToken(accessToken, config));
+  return response.data;
+}
+
+export async function createCollection(accessToken, collection, config = {}) {
+  const response = await client.post(
+    "/collections",
+    collection,
+    withAccessToken(accessToken, config),
+  );
+  return response.data;
+}
+
+export async function addRecipeToCollection(accessToken, collectionId, recipeId, config = {}) {
+  await client.put(
+    `/collections/${encodeURIComponent(collectionId)}/recipes/${encodeURIComponent(recipeId)}`,
+    null,
+    withAccessToken(accessToken, config),
+  );
+}
+
+export async function exportAccountData(accessToken, config = {}) {
+  const response = await client.get(
+    "/account/export",
+    withAccessToken(accessToken, { ...config, responseType: "blob" }),
+  );
+  return response.data;
+}
+
+export async function deleteAccount(accessToken, config = {}) {
+  await client.delete("/account", withAccessToken(accessToken, {
+    ...config,
+    data: { confirmation: "DELETE" },
+  }));
+}
+
+function withAccessToken(accessToken, config = {}) {
+  if (typeof accessToken !== "string" || !accessToken.trim()) {
+    throw new Error("An access token is required");
+  }
+  return {
+    ...config,
+    headers: {
+      ...config.headers,
+      Authorization: `Bearer ${accessToken.trim()}`,
+    },
+  };
+}

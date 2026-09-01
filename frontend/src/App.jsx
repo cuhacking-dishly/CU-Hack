@@ -1,6 +1,8 @@
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import RouteEffects from "./components/RouteEffects.jsx";
+import AccountControl from "./components/AccountControl.jsx";
+import { AuthProvider } from "./auth/AuthContext.jsx";
 import GoalEntryPage from "./pages/GoalEntryPage.jsx";
 import LikedRecipesPage from "./pages/LikedRecipesPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
@@ -39,9 +41,12 @@ function AppRoutes() {
 function App() {
   return (
     <MotionConfig reducedMotion="user">
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <AccountControl />
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
     </MotionConfig>
   );
 }

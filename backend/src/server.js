@@ -3,6 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 const goalRoutes = require("./routes/goalRoutes");
+const accountRoutes = require("./routes/accountRoutes");
 const recipeRoutes = require("./routes/recipeRoutes");
 const swipeRoutes = require("./routes/swipeRoutes");
 const { createHttpError } = require("./routes/routeUtils");
@@ -35,6 +36,7 @@ app.get("/api/ready", (_req, res) => {
 app.use("/api", goalRoutes);
 app.use("/api", recipeRoutes);
 app.use("/api", swipeRoutes);
+app.use("/api", accountRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Route not found" });
@@ -124,7 +126,12 @@ function normalizeError(error) {
 
 function redactConfiguredSecrets(value) {
   let redacted = String(value);
-  for (const name of ["GEMINI_API_KEY", "SPOONACULAR_API_KEY"]) {
+  for (const name of [
+    "GEMINI_API_KEY",
+    "SPOONACULAR_API_KEY",
+    "SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_SECRET_KEY",
+  ]) {
     const secret = process.env[name];
     if (typeof secret === "string" && secret.trim() !== "") {
       const rawVariants = [secret, secret.trim()];

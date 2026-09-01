@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AuthContext, guestValue } from "../auth/AuthContext.jsx";
 import {
   clearDeckSessions,
   readDeckSession,
@@ -14,6 +15,7 @@ const apiMocks = vi.hoisted(() => ({
   getCurrentGoal: vi.fn(),
   getRecipes: vi.fn(),
   logSwipe: vi.fn(),
+  saveCloudRecipe: vi.fn(),
 }));
 
 const motionMocks = vi.hoisted(() => ({
@@ -35,6 +37,7 @@ vi.mock("../api/client.js", () => ({
   getCurrentGoal: apiMocks.getCurrentGoal,
   getRecipes: apiMocks.getRecipes,
   logSwipe: apiMocks.logSwipe,
+  saveCloudRecipe: apiMocks.saveCloudRecipe,
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -197,11 +200,14 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function renderDeck() {
-  return render(
+function renderDeck(auth) {
+  const page = (
     <MemoryRouter initialEntries={["/deck"]}>
       <SwipeDeckPage />
-    </MemoryRouter>,
+    </MemoryRouter>
+  );
+  return render(
+    auth ? <AuthContext.Provider value={{ ...guestValue, ...auth }}>{page}</AuthContext.Provider> : page,
   );
 }
 
@@ -221,6 +227,7 @@ describe("SwipeDeckPage", () => {
     apiMocks.getCurrentGoal.mockReset();
     apiMocks.getRecipes.mockReset();
     apiMocks.logSwipe.mockReset();
+    apiMocks.saveCloudRecipe.mockReset();
     routerMocks.navigate.mockReset();
     motionMocks.animate.mockReset();
     motionMocks.prefersReducedMotion.mockReset();
@@ -228,6 +235,7 @@ describe("SwipeDeckPage", () => {
     apiMocks.getCurrentGoal.mockResolvedValue(CURRENT_GOAL);
     apiMocks.getRecipes.mockResolvedValue(recipePage([FIRST_RECIPE, SECOND_RECIPE]));
     apiMocks.logSwipe.mockResolvedValue({ success: true });
+    apiMocks.saveCloudRecipe.mockResolvedValue(FIRST_RECIPE);
     motionMocks.animate.mockResolvedValue(undefined);
     motionMocks.prefersReducedMotion.mockReturnValue(false);
   });
@@ -359,6 +367,17 @@ describe("SwipeDeckPage", () => {
     expect(routerMocks.navigate).not.toHaveBeenCalled();
     expect(readDeckSession("demo-user-1", GOAL_UPDATED_AT)).toMatchObject({ currentIndex: 1 });
     expect(getLikedRecipes("demo-user-1")).toEqual([FIRST_RECIPE, DEMO_RECIPE_MATCH]);
+  });
+
+  it("saves right swipes to the authenticated cloud library instead of guest storage", async () => {
+    const user = userEvent.setup();
+    apiMocks.getRecipes.mockResolvedValue(recipePage([FIRST_RECIPE, SECOND_RECIPE]));
+    renderDeck({ authReady: true, accessToken: "cloud-token", user: { id: "user-1" } });
+    await screen.findByText(`Match 1: ${FIRST_RECIPE.title}`);
+    await user.click(screen.getByRole("button", { name: "Like recipe" }));
+    await screen.findByText(`Match 2: ${SECOND_RECIPE.title}`);
+    expect(apiMocks.saveCloudRecipe).toHaveBeenCalledWith("cloud-token", FIRST_RECIPE, expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(getLikedRecipes("demo-user-1")).toEqual([DEMO_RECIPE_MATCH]);
   });
 
   it("does not save a left-swiped (skipped) recipe as liked", async () => {

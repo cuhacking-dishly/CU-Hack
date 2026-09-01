@@ -14,7 +14,9 @@ import {
   getCurrentGoal,
   getRecipes,
   logSwipe,
+  saveCloudRecipe,
 } from "../api/client.js";
+import { useAuth } from "../auth/AuthContext.jsx";
 import { USER_ID } from "../constants.js";
 import { readDeckSession, writeDeckSession } from "../utils/deckSession.js";
 import { addLikedRecipe } from "../utils/likedRecipes.js";
@@ -89,6 +91,7 @@ function normalizeRecipePage(response, requestedOffset) {
 
 function SwipeDeckPage() {
   const navigate = useNavigate();
+  const auth = useAuth();
   const [deck, setDeck] = useState(createEmptyDeck);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -323,7 +326,11 @@ function SwipeDeckPage() {
         if (!isMountedRef.current || controller.signal.aborted) return true;
 
         if (direction === "right") {
-          addLikedRecipe(USER_ID, recipe);
+          if (auth.accessToken) {
+            await saveCloudRecipe(auth.accessToken, recipe, { signal: controller.signal });
+          } else {
+            addLikedRecipe(USER_ID, recipe);
+          }
         }
 
         const activeRecipe = deckRef.current.recipes[deckRef.current.currentIndex];
@@ -346,7 +353,7 @@ function SwipeDeckPage() {
         pendingSwipeControllersRef.current.delete(controller);
       }
     },
-    [commitDeck, createSwipeController],
+    [auth.accessToken, commitDeck, createSwipeController],
   );
 
   const requestSwipe = useCallback(

@@ -1,14 +1,14 @@
 openapi: 3.1.0
 info:
   title: Recipe Match Backend API
-  version: 1.3.0
+  version: 2.0.0
   license:
     name: UNLICENSED
     identifier: LicenseRef-UNLICENSED
   description: |
-    Backend contract for natural-language goal parsing, in-memory goal and swipe
-    storage, and normalized Spoonacular recipe data. The API has no authentication
-    and all stored state is erased on process restart.
+    Backend contract for natural-language goal parsing, in-memory guest goal and
+    swipe storage, normalized Spoonacular data, and the optional authenticated
+    Supabase recipe library. Guest mode does not require an account service.
 servers:
   - url: /api
     description: API path on the selected backend origin
@@ -21,8 +21,215 @@ tags:
     description: Normalized Spoonacular search and detail data.
   - name: Swipes
     description: In-memory recipe preference recording.
+  - name: Accounts
+    description: Optional authenticated recipe library and account controls.
 security: []
 paths:
+  /auth/config:
+    get:
+      tags: [Accounts]
+      operationId: getAuthConfig
+      summary: Discover optional public account configuration
+      responses:
+        "200":
+          description: Disabled, or enabled with the intentionally public Supabase URL and publishable key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthConfig"
+        "403": { $ref: "#/components/responses/CorsForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /me:
+    get:
+      tags: [Accounts]
+      operationId: getCurrentAccount
+      summary: Get the authenticated user's bounded public profile
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Current account identity.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountProfile" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /saved-recipes:
+    get:
+      tags: [Accounts]
+      operationId: listSavedRecipes
+      summary: List the authenticated user's saved recipes
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 100 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 10000, default: 0 } }
+      responses:
+        "200":
+          description: Private saved recipe page, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [recipes, pagination]
+                properties:
+                  recipes: { type: array, items: { $ref: "#/components/schemas/SavedRecipe" } }
+                  pagination: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /saved-recipes/import:
+    post:
+      tags: [Accounts]
+      operationId: importGuestRecipes
+      summary: Idempotently import up to 200 guest recipe snapshots
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipes]
+              properties:
+                recipes: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/Recipe" } }
+      responses:
+        "200": { description: Import accepted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /saved-recipes/{recipeId}:
+    parameters:
+      - $ref: "#/components/parameters/AccountRecipeId"
+    put:
+      tags: [Accounts]
+      operationId: saveRecipe
+      summary: Idempotently save one recipe snapshot
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipe]
+              properties: { recipe: { $ref: "#/components/schemas/Recipe" } }
+      responses:
+        "200": { description: Saved recipe, content: { application/json: { schema: { $ref: "#/components/schemas/SavedRecipe" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [Accounts]
+      operationId: updateSavedRecipe
+      summary: Update private notes and/or rating
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes: { type: string, maxLength: 2000 }
+                rating: { type: [integer, "null"], minimum: 1, maximum: 5 }
+      responses:
+        "200": { description: Updated recipe. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Accounts]
+      operationId: removeSavedRecipe
+      summary: Remove one saved recipe
+      security: [{ BearerAuth: [] }]
+      responses:
+        "204": { description: Removed or already absent. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /collections:
+    get:
+      tags: [Accounts]
+      operationId: listCollections
+      summary: List private collections
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { description: Collections. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Accounts]
+      operationId: createCollection
+      summary: Create a private collection
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CollectionInput" }
+      responses:
+        "201": { description: Collection created. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /collections/{collectionId}:
+    parameters:
+      - $ref: "#/components/parameters/CollectionId"
+    patch:
+      tags: [Accounts]
+      operationId: updateCollection
+      summary: Update a private collection
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CollectionInput" } } }
+      responses:
+        "200": { description: Collection updated. }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Accounts]
+      operationId: deleteCollection
+      summary: Delete a private collection
+      security: [{ BearerAuth: [] }]
+      responses:
+        "204": { description: Deleted or already absent. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /collections/{collectionId}/recipes/{recipeId}:
+    parameters:
+      - $ref: "#/components/parameters/CollectionId"
+      - $ref: "#/components/parameters/AccountRecipeId"
+    put:
+      tags: [Accounts]
+      operationId: addRecipeToCollection
+      summary: Idempotently add a saved recipe to a collection
+      security: [{ BearerAuth: [] }]
+      responses:
+        "204": { description: Membership present. }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Accounts]
+      operationId: removeRecipeFromCollection
+      summary: Remove a recipe from a collection
+      security: [{ BearerAuth: [] }]
+      responses:
+        "204": { description: Membership absent. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /account/export:
+    get:
+      tags: [Accounts]
+      operationId: exportAccount
+      summary: Download all private Dishly account data as JSON
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { description: JSON attachment. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /account:
+    delete:
+      tags: [Accounts]
+      operationId: deleteAccount
+      summary: Permanently delete the authenticated account
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirmation]
+              properties: { confirmation: { type: string, const: DELETE } }
+      responses:
+        "204": { description: Account and cascading data deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
   /health:
     get:
       tags: [Operations]
@@ -286,7 +493,22 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Supabase JWT
   parameters:
+    AccountRecipeId:
+      name: recipeId
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[1-9][0-9]{0,31}$" }
+    CollectionId:
+      name: collectionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     UserId:
       name: userId
       in: query
@@ -328,6 +550,34 @@ components:
         maxLength: 32
       example: "12345"
   schemas:
+    AuthConfig:
+      oneOf:
+        - type: object
+          required: [enabled]
+          properties: { enabled: { type: boolean, const: false } }
+        - type: object
+          required: [enabled, url, publishableKey]
+          properties:
+            enabled: { type: boolean, const: true }
+            url: { type: string, format: uri }
+            publishableKey: { type: string, minLength: 1 }
+    AccountProfile:
+      type: object
+      required: [id, email, displayName, avatarUrl]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        displayName: { type: string, maxLength: 100 }
+        avatarUrl: { type: string }
+    SavedRecipe:
+      type: object
+      description: Sanitized Recipe fields plus private savedId, notes, rating, savedAt, and updatedAt metadata.
+    CollectionInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        description: { type: string, maxLength: 500 }
     Health:
       type: object
       additionalProperties: false
@@ -666,6 +916,11 @@ components:
           type: string
           minLength: 1
   responses:
+    Unauthorized:
+      description: A valid Supabase bearer session is required.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
     BadRequest:
       description: Request validation failed or the JSON body is malformed.
       content:

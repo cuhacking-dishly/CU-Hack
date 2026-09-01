@@ -17,6 +17,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
+  padding-right: 112px;
   animation: slide-in-left 460ms var(--ease-out-expo) both;
 }
 
@@ -69,6 +70,16 @@
 .liked-header h1:focus {
   outline: none;
 }
+
+.liked-sync-label { margin: 9px 0 0; color: rgba(248,245,237,.68); font-size: .86rem; font-weight: 750; }
+.liked-library-tools { width: min(100%,1120px); margin: 0 auto 22px; display: grid; grid-template-columns: minmax(220px,1fr) minmax(300px,1fr); gap: 12px; }
+.liked-library-tools label, .liked-card-controls label { display: grid; gap: 6px; color: rgba(248,245,237,.72); font-size: .76rem; font-weight: 850; }
+.liked-library-tools input, .liked-card-controls :is(select,textarea) { width: 100%; border: 1px solid rgba(229,196,110,.28); border-radius: 11px; padding: 10px 12px; color: #f8f5ed; background: rgba(248,245,237,.08); outline: 0; }
+.liked-library-tools input:focus, .liked-card-controls :is(select,textarea):focus { border-color: #e5c46e; box-shadow: 0 0 0 3px rgba(229,196,110,.14); }
+.liked-new-collection { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 8px; }
+.liked-new-collection button, .liked-card-controls button { min-height: 38px; border: 1px solid rgba(229,196,110,.45); border-radius: 10px; padding: 0 13px; color: #fff8dc; background: rgba(229,196,110,.12); font-weight: 850; cursor: pointer; }
+.liked-new-collection small { grid-column: 1 / -1; color: #e5c46e; }
+.liked-library-state { width: min(100%,1120px); margin: 36px auto; color: rgba(248,245,237,.78); font-weight: 750; }
 
 .liked-people-filter {
   display: inline-flex;
@@ -162,6 +173,16 @@
   min-width: 0;
   animation: slide-in-left 520ms var(--ease-out-expo) both;
 }
+
+.liked-card-shell { width: 100%; align-self: flex-start; overflow: hidden; border-radius: var(--radius-md); background: #f8f5ed; box-shadow: 0 20px 50px rgba(0,0,0,.28); }
+.liked-card-shell .liked-card { box-shadow: none; }
+.liked-card-controls { display: grid; gap: 9px; border-top: 1px solid rgba(65,50,34,.16); padding: 13px; color: #18231d; background: #f8f5ed; }
+.liked-card-controls label { color: #586957; }
+.liked-card-controls :is(select,textarea) { resize: vertical; border-color: rgba(65,50,34,.18); color: #18231d; background: white; }
+.liked-card-controls button { color: #f8f5ed; background: #315f3f; }
+.liked-card-controls button:disabled { opacity: .55; }
+.liked-card-controls .liked-remove-button { color: #9d3223; background: transparent; border-color: rgba(157,50,35,.28); }
+.liked-card-controls p { margin: 0; color: #315f3f; font-size: .78rem; font-weight: 850; }
 
 .liked-card-entry--right {
   animation-name: slide-in-right;
@@ -306,6 +327,9 @@
     width: 100%;
     justify-content: space-between;
   }
+
+  .liked-header { padding-right: 0; padding-top: 48px; }
+  .liked-library-tools { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

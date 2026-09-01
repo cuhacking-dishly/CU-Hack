@@ -1,14 +1,26 @@
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import {
+  addRecipeToCollection,
   API_TIMEOUT_MS,
+  createCollection,
+  deleteAccount,
+  exportAccountData,
+  getAuthConfig,
+  getCollections,
   getCurrentGoal,
   getApiErrorMessage,
   getRecipeById,
   getRecipes,
+  getSavedRecipes,
+  getMe,
+  importCloudRecipes,
   logSwipe,
   parseGoal,
+  removeCloudRecipe,
+  saveCloudRecipe,
   saveGoal,
+  updateCloudRecipe,
 } from "./client.js";
 import { server } from "../test/server.js";
 
@@ -237,6 +249,49 @@ describe("API client", () => {
       },
       header: "frontend-test",
     });
+  });
+
+  it("implements authenticated recipe, collection, export, and account requests", async () => {
+    const calls = [];
+    server.use(
+      http.get(`${API_URL}/auth/config`, () => HttpResponse.json({ enabled: true })),
+      http.get(`${API_URL}/me`, ({ request }) => { calls.push(["me", request.headers.get("authorization")]); return HttpResponse.json({ id: "u1" }); }),
+      http.get(`${API_URL}/saved-recipes`, ({ request }) => { calls.push(["list", request.headers.get("authorization")]); return HttpResponse.json({ recipes: [recipe] }); }),
+      http.put(`${API_URL}/saved-recipes/:id`, async ({ request, params }) => { calls.push(["save", params.id, await request.json()]); return HttpResponse.json(recipe); }),
+      http.post(`${API_URL}/saved-recipes/import`, async ({ request }) => { calls.push(["import", await request.json()]); return HttpResponse.json({ imported: 1 }); }),
+      http.patch(`${API_URL}/saved-recipes/:id`, async ({ request }) => { calls.push(["update", await request.json()]); return HttpResponse.json({ ...recipe, notes: "great" }); }),
+      http.delete(`${API_URL}/saved-recipes/:id`, ({ params }) => { calls.push(["remove", params.id]); return new HttpResponse(null, { status: 204 }); }),
+      http.get(`${API_URL}/collections`, () => HttpResponse.json({ collections: [] })),
+      http.post(`${API_URL}/collections`, async ({ request }) => HttpResponse.json({ id: "c1", ...(await request.json()) }, { status: 201 })),
+      http.put(`${API_URL}/collections/:collectionId/recipes/:recipeId`, ({ params }) => { calls.push(["collect", params.collectionId, params.recipeId]); return new HttpResponse(null, { status: 204 }); }),
+      http.get(`${API_URL}/account/export`, ({ request }) => { calls.push(["export", request.headers.get("authorization")]); return new HttpResponse("{}", { headers: { "Content-Type": "application/json" } }); }),
+      http.delete(`${API_URL}/account`, async ({ request }) => { calls.push(["delete-account", await request.json()]); return new HttpResponse(null, { status: 204 }); }),
+    );
+
+    await expect(getAuthConfig()).resolves.toEqual({ enabled: true });
+    await expect(getMe("token")).resolves.toEqual({ id: "u1" });
+    await expect(getSavedRecipes("token")).resolves.toEqual({ recipes: [recipe] });
+    await expect(saveCloudRecipe("token", recipe)).resolves.toEqual(recipe);
+    await expect(importCloudRecipes("token", [recipe])).resolves.toEqual({ imported: 1 });
+    await expect(updateCloudRecipe("token", recipe.id, { notes: "great" })).resolves.toMatchObject({ notes: "great" });
+    await removeCloudRecipe("token", recipe.id);
+    await expect(getCollections("token")).resolves.toEqual({ collections: [] });
+    await expect(createCollection("token", { name: "Dinner" })).resolves.toMatchObject({ id: "c1", name: "Dinner" });
+    await addRecipeToCollection("token", "c1", recipe.id);
+    await expect(exportAccountData("token")).resolves.toBeInstanceOf(Blob);
+    await deleteAccount("token");
+
+    expect(calls).toContainEqual(["me", "Bearer token"]);
+    expect(calls).toContainEqual(["save", recipe.id, { recipe }]);
+    expect(calls).toContainEqual(["import", { recipes: [recipe] }]);
+    expect(calls).toContainEqual(["update", { notes: "great" }]);
+    expect(calls).toContainEqual(["collect", "c1", recipe.id]);
+    expect(calls).toContainEqual(["delete-account", { confirmation: "DELETE" }]);
+  });
+
+  it("fails client-side before protected requests when no access token is supplied", async () => {
+    await expect(getMe(" ")).rejects.toThrow("An access token is required");
+    await expect(getMe(null)).rejects.toThrow("An access token is required");
   });
 
   it.each([

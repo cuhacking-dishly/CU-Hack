@@ -98,6 +98,11 @@ async function installApiFixtures(
 
     observed.apiCalls.push(`${method} ${path}`);
 
+    if (method === "GET" && path === "/api/auth/config") {
+      await fulfillJson(route, { enabled: false });
+      return;
+    }
+
     if (method === "POST" && path === "/api/parse-goal") {
       const payload = request.postDataJSON();
       observed.parsedGoals.push(payload);
@@ -176,6 +181,21 @@ test.beforeEach(async ({ page }) => {
   await installImageFixtures(page);
 });
 
+test("keeps guest mode primary while optional sign-in stays in the top right", async ({ page }) => {
+  await installApiFixtures(page);
+  await page.goto("/");
+  const signIn = page.getByRole("button", { name: "Sign in" });
+  await expect(signIn).toBeVisible();
+  const box = await signIn.boundingBox();
+  expect(box.x + box.width).toBeGreaterThan(page.viewportSize().width - 32);
+  await signIn.click();
+  await expect(page.getByRole("dialog", { name: "Save recipes everywhere" })).toBeVisible();
+  await expect(page.getByText(/fully usable as a guest/i)).toBeVisible();
+  await expect(page.getByText(/being connected/i)).toBeVisible();
+  await page.getByRole("button", { name: "Close sign-in" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
 test("completes goal entry, opens the exact liked card, and renders its full nutrition", async ({
   page,
 }) => {
@@ -185,7 +205,7 @@ test("completes goal entry, opens the exact liked card, and renders its full nut
   await expect(page).toHaveTitle("dishly");
   await expect(page.getByRole("link", { name: "Dishly home" })).toBeVisible();
   await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/images/dishly-icon.png");
-  expect(observed.apiCalls).toEqual([]);
+  expect(observed.apiCalls.filter((call) => call !== "GET /api/auth/config")).toEqual([]);
 
   await page.getByRole("textbox", { name: "Your food goal" }).fill("vegan, high protein, under 30 minutes");
   await page.getByRole("button", { name: "Start swiping" }).click();

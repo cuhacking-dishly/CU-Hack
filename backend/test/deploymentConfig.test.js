@@ -16,6 +16,9 @@ test("Render deploys the locked backend only after checks and readiness pass", a
   assert.match(renderConfig, /^\s+healthCheckPath: \/api\/ready$/m);
   assert.match(renderConfig, /^\s+autoDeployTrigger: checksPass$/m);
   assert.match(renderConfig, /^\s+value: "https:\/\/dishly\.brandonjameschoi\.com"$/m);
+  for (const key of ["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY"]) {
+    assert.match(renderConfig, new RegExp(`^\\s+- key: ${key}\\r?\\n\\s+sync: false$`, "m"));
+  }
   assert.match(renderConfig, /^\s+- key: GEMINI_MODEL\r?\n\s+value: gemini-3\.5-flash-lite$/m);
   assert.match(
     renderConfig,
