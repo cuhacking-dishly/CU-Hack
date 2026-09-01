@@ -93,7 +93,7 @@ paths:
               text: cozy Japanese dessert, no peanuts, under 600 calories
       responses:
         "200":
-          description: The normalized filter parsed by Gemini.
+          description: The normalized filter parsed by Gemini, with explicit numeric bounds deterministically enforced.
           content:
             application/json:
               schema:
@@ -196,7 +196,7 @@ paths:
       tags: [Recipes]
       operationId: searchRecipes
       summary: Search recipes for a user's current goal
-      description: Uses an empty filter if the user has no saved goal.
+      description: Uses an empty filter if the user has no saved goal. Recipes outside saved numeric nutrition or time bounds, or missing values needed to verify those bounds, are omitted.
       parameters:
         - $ref: "#/components/parameters/UserId"
         - $ref: "#/components/parameters/Limit"

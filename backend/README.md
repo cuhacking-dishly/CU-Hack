@@ -136,7 +136,7 @@ All properties are optional. An unconstrained goal is `{}`. Extra properties are
 | `intolerances` | Up to the supported allergy categories: `dairy`, `egg`, `gluten`, `grain`, `peanut`, `seafood`, `sesame`, `shellfish`, `soy`, `sulfite`, `tree nut`, and `wheat`. Duplicate values are removed. |
 | `excludeIngredients` | At most 20 nonblank strings, each at most 80 characters. Duplicate names are removed case-insensitively. |
 
-Gemini first interprets the whole natural-language request, then independently classifies its craving, culture, meal, diet, allergy, time, and nutrition constraints into this schema. Culture and allergy entries are intentionally free-form: “Chinese or Italian” becomes two OR cuisines, while a non-standard allergy such as strawberry or alpha-gal is interpreted into explicit ingredient exclusions. Obvious spelling variants are normalized and a specific culture can map to its closest supported broad cuisine. For example, “take me to Tokyo for a sweet treat; I’m allergic to peanuts” becomes a Japanese dessert filter with the peanut intolerance and an explicit peanut exclusion. Unsupported or invalid model-produced fields are dropped. A client-provided `parsedFilter` on `POST /api/goal` is validated strictly and returns `400` if invalid.
+Gemini first interprets the whole natural-language request, then independently classifies its craving, culture, meal, diet, allergy, time, and nutrition constraints into this schema. Culture and allergy entries are intentionally free-form: “Chinese or Italian” becomes two OR cuisines, while a non-standard allergy such as strawberry or alpha-gal is interpreted into explicit ingredient exclusions. Obvious spelling variants are normalized and a specific culture can map to its closest supported broad cuisine. For example, “take me to Tokyo for a sweet treat; I’m allergic to peanuts” becomes a Japanese dessert filter with the peanut intolerance and an explicit peanut exclusion. Unsupported or invalid model-produced fields are dropped. Explicit numeric calorie, protein, carbohydrate, and preparation-time bounds are then deterministically overlaid on the model output, so a clear phrase such as “under 700 calories” cannot be omitted or contradicted by the model. A client-provided `parsedFilter` on `POST /api/goal` is validated strictly and returns `400` if invalid.
 
 Allergy filtering narrows provider results; it does not certify a recipe as medically safe or account for cross-contact, substitutions, or incomplete provider data. People must inspect the final ingredient list and labels before eating.
 
@@ -330,6 +330,10 @@ popularity. Within each provider page, normalized recipes are ranked so
 image-backed recipes lead, then Spoonacular score, aggregate likes, health
 score, popularity flag, and available instructions break ties. This keeps the
 deck focused on complete, appealing recipes without making extra provider calls.
+Recipes with known numeric values outside the saved calorie, protein,
+carbohydrate, or preparation-time bounds are removed after normalization;
+when a numeric bound exists, recipes missing the required provider value are
+also removed rather than presented as though they were verified matches.
 
 Returns `503` without `SPOONACULAR_API_KEY`, `502` for provider or response failures, and `504` on timeout.
 

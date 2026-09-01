@@ -51,6 +51,12 @@ deadline covers the whole model chain. Keep the browser deadline longer than
 the provider deadline so a slow provider response is reported accurately
 instead of becoming a generic client timeout.
 
+After Gemini parsing, Dishly deterministically preserves explicit numeric
+calorie, protein, carbohydrate, and preparation-time limits from the user's
+text. Recipe results are checked again after Spoonacular normalization; a
+recipe outside a saved numeric bound, or missing the value needed to verify
+that bound, is not placed in the deck.
+
 Render builds with `npm ci`, waits for `/api/ready`, and deploys `main` only
 after the GitHub quality gate passes. That gate performs locked installs,
 production dependency audits, backend and frontend coverage, linting, a

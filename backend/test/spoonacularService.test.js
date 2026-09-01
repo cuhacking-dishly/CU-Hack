@@ -148,21 +148,48 @@ test("searchRecipes sends canonical filters, pagination, enrichment, and a deadl
       sourceName: "Example Kitchen",
       sourceUrl: "https://example.com/recipe",
     },
-    {
-      id: "124",
-      title: "Minimal Recipe",
-      image: "",
-      readyInMinutes: null,
-      servings: null,
-      calories: null,
-      macros: { protein_g: null, carbs_g: null, fat_g: null },
-      diets: [],
-      ingredients: [],
-      instructions: [],
-      sourceName: "",
-      sourceUrl: "",
-    },
   ]);
+});
+
+test("searchRecipePage enforces numeric limits on normalized provider results", async () => {
+  process.env.SPOONACULAR_API_KEY = "spoon-key";
+  const recipe = (id, calories, protein, carbs, readyInMinutes) => ({
+    id,
+    title: `Recipe ${id}`,
+    readyInMinutes,
+    nutrition: {
+      nutrients: [
+        { name: "Calories", amount: calories },
+        { name: "Protein", amount: protein },
+        { name: "Carbohydrates", amount: carbs },
+      ],
+    },
+  });
+  global.fetch = async () =>
+    jsonResponse({
+      results: [
+        recipe(1, 550, 35, 45, 30),
+        recipe(2, 701, 35, 45, 30),
+        recipe(3, 550, 29, 45, 30),
+        recipe(4, 550, 35, 61, 30),
+        recipe(5, 550, 35, 45, 46),
+        { id: 6, title: "Unknown nutrition" },
+      ],
+    });
+  const { searchRecipePage } = loadService();
+
+  const page = await searchRecipePage(
+    {
+      minCalories: 500,
+      maxCalories: 700,
+      minProtein_g: 30,
+      maxCarbs_g: 60,
+      maxReadyTime: 45,
+    },
+    { limit: 10 }
+  );
+
+  assert.deepEqual(page.recipes.map(({ id }) => id), ["1"]);
 });
 
 test("searchRecipes uses safe defaults and compatibility aliases", async (t) => {

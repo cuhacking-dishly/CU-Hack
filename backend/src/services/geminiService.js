@@ -1,6 +1,6 @@
 const { GoogleGenAI } = require("@google/genai");
 
-const { GOAL_FILTER_JSON_SCHEMA, normalizeGoalFilter } = require("./goalFilter");
+const { FILTER_LIMITS, GOAL_FILTER_JSON_SCHEMA, normalizeGoalFilter } = require("./goalFilter");
 
 const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 const DEFAULT_GEMINI_FALLBACK_MODELS = ["gemini-3.6-flash"];
@@ -163,7 +163,142 @@ function shouldTryFallback(error) {
   return status === null || FALLBACK_HTTP_STATUS_CODES.includes(status);
 }
 
-function normalizeGeminiResponse(response) {
+function boundedExplicitInteger(rawValue, field, direction) {
+  const value = Number(rawValue);
+  if (!Number.isFinite(value)) return null;
+
+  const integer = direction === "minimum" ? Math.ceil(value) : Math.floor(value);
+  const { min, max } = FILTER_LIMITS[field];
+  return integer >= min && integer <= max ? integer : null;
+}
+
+function firstCapturedNumber(text, patterns) {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+function addExplicitRange(constraints, text, { minimum, maximum, patterns }) {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+
+    const lower = boundedExplicitInteger(match[1], minimum, "minimum");
+    const upper = boundedExplicitInteger(match[2], maximum, "maximum");
+    if (lower !== null && upper !== null && lower <= upper) {
+      constraints[minimum] = lower;
+      constraints[maximum] = upper;
+    }
+    return;
+  }
+}
+
+function addExplicitBound(constraints, text, { field, direction, patterns }) {
+  const rawValue = firstCapturedNumber(text, patterns);
+  if (rawValue === null) return;
+
+  const value = boundedExplicitInteger(rawValue, field, direction);
+  if (value !== null) constraints[field] = value;
+}
+
+function extractExplicitNumericConstraints(text) {
+  const constraints = {};
+
+  addExplicitRange(constraints, text, {
+    minimum: "minCalories",
+    maximum: "maxCalories",
+    patterns: [
+      /\bbetween\s+(\d+(?:\.\d+)?)\s*(?:kcal|calories?|cals?)?\s+(?:and|to)\s+(\d+(?:\.\d+)?)\s*(?:kcal|calories?|cals?)\b/i,
+      /\b(\d+(?:\.\d+)?)\s*(?:kcal|calories?|cals?)?\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*(?:kcal|calories?|cals?)\b/i,
+    ],
+  });
+  addExplicitBound(constraints, text, {
+    field: "maxCalories",
+    direction: "maximum",
+    patterns: [
+      /\b(?:under|below|less than|at most|no more than|up to|max(?:imum)?(?: of)?)\s+(\d+(?:\.\d+)?)\s*(?:kcal|calories?|cals?)\b/i,
+      /\b(\d+(?:\.\d+)?)\s*(?:kcal|calories?|cals?)\s*(?:or less|maximum|max)\b/i,
+    ],
+  });
+  addExplicitBound(constraints, text, {
+    field: "minCalories",
+    direction: "minimum",
+    patterns: [
+      /\b(?:at least|no less than|minimum(?: of)?|min(?:imum)?(?: of)?|(?<!no\s)more than|over)\s+(\d+(?:\.\d+)?)\s*(?:kcal|calories?|cals?)\b/i,
+      /\b(\d+(?:\.\d+)?)\s*(?:kcal|calories?|cals?)\s*(?:or more|minimum|min)\b/i,
+    ],
+  });
+
+  for (const nutrient of [
+    { label: "protein", minimum: "minProtein_g", maximum: "maxProtein_g" },
+    { label: "(?:carbs?|carbohydrates?)", minimum: "minCarbs_g", maximum: "maxCarbs_g" },
+  ]) {
+    const quantity = `(\\d+(?:\\.\\d+)?)\\s*(?:g|grams?)\\s*(?:of\\s+)?${nutrient.label}`;
+    addExplicitBound(constraints, text, {
+      field: nutrient.maximum,
+      direction: "maximum",
+      patterns: [
+        new RegExp(
+          `\\b(?:under|below|less than|at most|no more than|up to|max(?:imum)?(?: of)?)\\s+${quantity}\\b`,
+          "i"
+        ),
+        new RegExp(`\\b${quantity}\\s*(?:or less|maximum|max)\\b`, "i"),
+      ],
+    });
+    addExplicitBound(constraints, text, {
+      field: nutrient.minimum,
+      direction: "minimum",
+      patterns: [
+        new RegExp(
+          `\\b(?:at least|no less than|minimum(?: of)?|min(?:imum)?(?: of)?|(?<!no\\s)more than|over)\\s+${quantity}\\b`,
+          "i"
+        ),
+        new RegExp(`\\b${quantity}\\s*(?:or more|minimum|min)\\b`, "i"),
+      ],
+    });
+  }
+
+  const timeMatch = text.match(
+    /\b(?:ready\s+)?(?:in\s+)?(?:under|within|in|less than|at most|no more than|up to|max(?:imum)?(?: of)?)\s+(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)\b/i
+  );
+  if (timeMatch) {
+    const amount = Number(timeMatch[1]);
+    const minutes = /^(?:hours?|hrs?)$/i.test(timeMatch[2]) ? amount * 60 : amount;
+    const value = boundedExplicitInteger(minutes, "maxReadyTime", "maximum");
+    if (value !== null) constraints.maxReadyTime = value;
+  } else if (
+    /\b(?:ready\s+)?(?:in\s+)?(?:under|within|in|less than|at most|no more than|up to)\s+(?:an?|one)\s+hours?\b/i.test(
+      text
+    )
+  ) {
+    constraints.maxReadyTime = 60;
+  }
+
+  return constraints;
+}
+
+function applyExplicitNumericConstraints(filter, text) {
+  const explicit = extractExplicitNumericConstraints(text);
+  const merged = { ...filter, ...explicit };
+
+  for (const [minimum, maximum] of [
+    ["minCalories", "maxCalories"],
+    ["minProtein_g", "maxProtein_g"],
+    ["minCarbs_g", "maxCarbs_g"],
+  ]) {
+    if (merged[minimum] === undefined || merged[maximum] === undefined) continue;
+    if (merged[minimum] <= merged[maximum]) continue;
+
+    if (explicit[minimum] !== undefined && explicit[maximum] === undefined) delete merged[maximum];
+    else if (explicit[maximum] !== undefined && explicit[minimum] === undefined) delete merged[minimum];
+  }
+
+  return normalizeGoalFilter(merged);
+}
+
+function normalizeGeminiResponse(response, text) {
   const responseText = stripMarkdownFences(response?.text);
   if (!responseText) {
     throw new GeminiServiceError({
@@ -193,7 +328,7 @@ function normalizeGeminiResponse(response) {
     });
   }
 
-  return normalizeGoalFilter(parsed);
+  return applyExplicitNumericConstraints(normalizeGoalFilter(parsed), text);
 }
 
 async function parseGoal(rawText) {
@@ -231,7 +366,7 @@ async function parseGoal(rawText) {
           abortSignal,
         },
       });
-      return normalizeGeminiResponse(response);
+      return normalizeGeminiResponse(response, text);
     } catch (error) {
       lastError = error;
       const hasFallback = index + 1 < models.length;

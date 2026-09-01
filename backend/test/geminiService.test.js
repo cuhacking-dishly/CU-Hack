@@ -188,6 +188,46 @@ test("parseGoal defaults to Flash-Lite, a bounded retry, and a 90 second deadlin
   assert.equal(capturedTimeout, 90000);
 });
 
+test("explicit numeric limits override omissions and conflicts in model output", async () => {
+  process.env.GEMINI_API_KEY = "test-key";
+  installSdkMock(async () => ({
+    text: JSON.stringify({
+      minCalories: 800,
+      maxProtein_g: 20,
+      minCarbs_g: 80,
+      maxReadyTime: 300,
+      cuisines: ["italian"],
+    }),
+  }));
+  const { parseGoal } = require("../src/services/geminiService");
+
+  assert.deepEqual(
+    await parseGoal(
+      "Italian food between 450 and 700 calories, at least 35g protein, " +
+        "no more than 50 grams of carbs, ready in 1.5 hours"
+    ),
+    {
+      minCalories: 450,
+      maxCalories: 700,
+      minProtein_g: 35,
+      maxCarbs_g: 50,
+      cuisines: ["italian"],
+      maxReadyTime: 90,
+    }
+  );
+});
+
+test("explicit calorie suffixes and an-hour phrasing remain deterministic", async () => {
+  process.env.GEMINI_API_KEY = "test-key";
+  installSdkMock(async () => ({ text: "{}" }));
+  const { parseGoal } = require("../src/services/geminiService");
+
+  assert.deepEqual(await parseGoal("600 calories or less and ready in under an hour"), {
+    maxCalories: 600,
+    maxReadyTime: 60,
+  });
+});
+
 test("parseGoal enforces the production timeout floor over stale hosting configuration", async (t) => {
   process.env.GEMINI_API_KEY = "test-key";
   process.env.GEMINI_TIMEOUT_MS = "30000";

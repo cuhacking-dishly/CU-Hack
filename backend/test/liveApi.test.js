@@ -42,7 +42,13 @@ test(
           Object.keys(parsedFilter).length > 0,
           "Gemini should return at least one useful search constraint"
         );
-        if (index === 0) assert.equal(parsedFilter.diet, "vegan");
+        if (index === 0) {
+          assert.equal(parsedFilter.diet, "vegan");
+          assert.equal(parsedFilter.maxCalories, 600);
+          assert.equal(parsedFilter.minProtein_g, 20);
+          assert.equal(parsedFilter.maxReadyTime, 45);
+        }
+        if (index === 1) assert.equal(parsedFilter.maxReadyTime, 60);
 
         for (const field of ["maxCalories", "minProtein_g", "maxReadyTime"]) {
           if (parsedFilter[field] !== undefined) {
@@ -56,6 +62,29 @@ test(
         const recipes = await searchRecipes(parsedFilter, { limit: 2, offset: 0 });
         assert.ok(Array.isArray(recipes));
         assert.ok(recipes.length > 0 && recipes.length <= 2, "Spoonacular should return a recipe");
+        for (const recipe of recipes) {
+          if (parsedFilter.minCalories !== undefined) {
+            assert.ok(recipe.calories >= parsedFilter.minCalories);
+          }
+          if (parsedFilter.maxCalories !== undefined) {
+            assert.ok(recipe.calories <= parsedFilter.maxCalories);
+          }
+          if (parsedFilter.minProtein_g !== undefined) {
+            assert.ok(recipe.macros.protein_g >= parsedFilter.minProtein_g);
+          }
+          if (parsedFilter.maxProtein_g !== undefined) {
+            assert.ok(recipe.macros.protein_g <= parsedFilter.maxProtein_g);
+          }
+          if (parsedFilter.minCarbs_g !== undefined) {
+            assert.ok(recipe.macros.carbs_g >= parsedFilter.minCarbs_g);
+          }
+          if (parsedFilter.maxCarbs_g !== undefined) {
+            assert.ok(recipe.macros.carbs_g <= parsedFilter.maxCarbs_g);
+          }
+          if (parsedFilter.maxReadyTime !== undefined) {
+            assert.ok(recipe.readyInMinutes <= parsedFilter.maxReadyTime);
+          }
+        }
 
         const detail = await getRecipeById(recipes[0].id);
         assert.equal(detail.id, recipes[0].id);

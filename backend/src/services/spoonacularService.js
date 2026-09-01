@@ -354,6 +354,22 @@ function compareRecipeQuality(left, right) {
   return left.index - right.index;
 }
 
+function recipeMatchesNumericFilter(recipe, filter) {
+  const checks = [
+    [recipe.calories, filter.minCalories, filter.maxCalories],
+    [recipe.macros.protein_g, filter.minProtein_g, filter.maxProtein_g],
+    [recipe.macros.carbs_g, filter.minCarbs_g, filter.maxCarbs_g],
+    [recipe.readyInMinutes, undefined, filter.maxReadyTime],
+  ];
+
+  return checks.every(([value, minimum, maximum]) => {
+    if (minimum === undefined && maximum === undefined) return true;
+    if (value === null) return false;
+    if (minimum !== undefined && value < minimum) return false;
+    return maximum === undefined || value <= maximum;
+  });
+}
+
 function hasMoreProviderResults(data, { limit, offset }) {
   const nextOffset = offset + limit;
   if (nextOffset > MAX_SEARCH_OFFSET) return false;
@@ -439,7 +455,7 @@ async function searchRecipePage(parsedFilter = {}, options = {}) {
   return {
     recipes: data.results
       .map((item, index) => ({ item, index, recipe: normalizeRecipe(item) }))
-      .filter((candidate) => candidate.recipe)
+      .filter((candidate) => candidate.recipe && recipeMatchesNumericFilter(candidate.recipe, filter))
       .sort(compareRecipeQuality)
       .slice(0, limit)
       .map((candidate) => candidate.recipe),
