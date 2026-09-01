@@ -1,5 +1,9 @@
 import { defineConfig } from "@playwright/test";
 
+const requestedBrowserChannel = process.env.PLAYWRIGHT_CHANNEL?.trim();
+const browserChannel =
+  requestedBrowserChannel === "chromium" ? undefined : requestedBrowserChannel || "msedge";
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,
@@ -12,7 +16,7 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:5173",
     browserName: "chromium",
-    channel: "msedge",
+    ...(browserChannel ? { channel: browserChannel } : {}),
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

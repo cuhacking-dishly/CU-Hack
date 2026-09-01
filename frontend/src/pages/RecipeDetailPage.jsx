@@ -149,30 +149,23 @@ function RecipeDetailPage() {
     const controller = new AbortController();
     let requestTimer;
 
-    setIsLoading(true);
-    setErrorMessage("");
-    setRecipe(null);
-
-    if (!recipeId) {
-      setErrorMessage(id ? "This recipe link is invalid." : "This recipe link is incomplete.");
-      setIsLoading(false);
-
-      return () => {
-        isCurrentRequest = false;
-        controller.abort();
-      };
-    }
-
-    if (routeStateRecipe) {
-      setRecipe(routeStateRecipe);
-      setIsLoading(false);
-      return () => {
-        isCurrentRequest = false;
-        controller.abort();
-      };
-    }
-
     async function loadRecipe() {
+      setIsLoading(true);
+      setErrorMessage("");
+      setRecipe(null);
+
+      if (!recipeId) {
+        setErrorMessage(id ? "This recipe link is invalid." : "This recipe link is incomplete.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (routeStateRecipe) {
+        setRecipe(routeStateRecipe);
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const response = await getRecipeById(recipeId, { signal: controller.signal });
         const isRecipe =
@@ -209,7 +202,14 @@ function RecipeDetailPage() {
       window.clearTimeout(requestTimer);
       controller.abort();
     };
-  }, [id, location.state, recipeId, retryCount, routeStateRecipe]);
+  }, [
+    id,
+    recipeId,
+    // The counter is a deliberate request trigger; retryRecipe changes no request argument.
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies
+    retryCount,
+    routeStateRecipe,
+  ]);
 
   useEffect(() => {
     if (isLoading || !errorMessage) return undefined;
@@ -301,7 +301,7 @@ function LoadedRecipe({ recipe }) {
   useEffect(() => {
     document.title = "dishly";
     headingRef.current?.focus({ preventScroll: true });
-  }, [title]);
+  }, []);
 
   return (
     <main className="recipe-detail-page">

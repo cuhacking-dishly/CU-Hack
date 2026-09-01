@@ -15,9 +15,13 @@
     "test:live": "node --test test/liveApi.test.js"
   },
   "dependencies": {
-    "@google/genai": "2.11.0",
+    "@google/genai": "2.20.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2"
+  },
+  "allowScripts": {
+    "@google/genai@2.20.0": true,
+    "protobufjs@7.6.5": true
   }
 }

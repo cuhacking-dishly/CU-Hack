@@ -35,7 +35,14 @@ function installSdkMock(generateContent) {
 }
 
 test.afterEach(() => {
-  for (const name of ["GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_TIMEOUT_MS", "NODE_ENV"]) {
+  for (const name of [
+    "GEMINI_API_KEY",
+    "GEMINI_FALLBACK_MODELS",
+    "GEMINI_MODEL",
+    "GEMINI_RETRY_ATTEMPTS",
+    "GEMINI_TIMEOUT_MS",
+    "NODE_ENV",
+  ]) {
     delete process.env[name];
   }
   clearModules();
@@ -73,6 +80,7 @@ test("parseGoal validates and caps goal text before calling Gemini", async () =>
 test("parseGoal uses the supported SDK, structured output, and a separate user input", async () => {
   process.env.GEMINI_API_KEY = "  test-key  ";
   process.env.GEMINI_MODEL = "gemini-custom-flash";
+  process.env.GEMINI_RETRY_ATTEMPTS = "3";
   process.env.GEMINI_TIMEOUT_MS = "2500";
   const capture = installSdkMock(async () => ({
     text: [
@@ -97,7 +105,20 @@ test("parseGoal uses the supported SDK, structured output, and a separate user i
   const parsed = await parseGoal(`  ${userInput}  `);
 
   assert.deepEqual(capture.constructorOptions, [
-    { apiKey: "test-key", httpOptions: { timeout: 2500 } },
+    {
+      apiKey: "test-key",
+      httpOptions: {
+        timeout: 2500,
+        retryOptions: {
+          attempts: 3,
+          initialDelay: 1,
+          maxDelay: 8,
+          expBase: 2,
+          jitter: 1,
+          httpStatusCodes: [408, 500, 502, 503, 504],
+        },
+      },
+    },
   ]);
   assert.deepEqual(parsed, {
     query: "ramen",
@@ -127,7 +148,7 @@ test("parseGoal uses the supported SDK, structured output, and a separate user i
   assert.equal(typeof request.config.abortSignal.addEventListener, "function");
 });
 
-test("parseGoal defaults to gemini-3.5-flash and a 90 second deadline", async (t) => {
+test("parseGoal defaults to Flash-Lite, a bounded retry, and a 90 second deadline", async (t) => {
   process.env.GEMINI_API_KEY = "test-key";
   process.env.GEMINI_TIMEOUT_MS = "not-a-number";
   let capturedTimeout;
@@ -136,18 +157,34 @@ test("parseGoal defaults to gemini-3.5-flash and a 90 second deadline", async (t
     return new AbortController().signal;
   });
   const capture = installSdkMock(async () => ({ text: "{}" }));
-  const { DEFAULT_GEMINI_TIMEOUT_MS, parseGoal, parseGoalWithGemini } = require(
-    "../src/services/geminiService"
-  );
+  const {
+    DEFAULT_GEMINI_FALLBACK_MODELS,
+    DEFAULT_GEMINI_RETRY_ATTEMPTS,
+    DEFAULT_GEMINI_TIMEOUT_MS,
+    parseGoal,
+    parseGoalWithGemini,
+  } = require("../src/services/geminiService");
 
+  assert.deepEqual(DEFAULT_GEMINI_FALLBACK_MODELS, ["gemini-3.6-flash"]);
+  assert.equal(DEFAULT_GEMINI_RETRY_ATTEMPTS, 2);
   assert.equal(DEFAULT_GEMINI_TIMEOUT_MS, 90000);
   assert.equal(parseGoalWithGemini, parseGoal);
   assert.deepEqual(await parseGoal("just something tasty"), {});
   assert.deepEqual(capture.constructorOptions[0], {
     apiKey: "test-key",
-    httpOptions: { timeout: 90000 },
+    httpOptions: {
+      timeout: 90000,
+      retryOptions: {
+        attempts: 2,
+        initialDelay: 1,
+        maxDelay: 8,
+        expBase: 2,
+        jitter: 1,
+        httpStatusCodes: [408, 500, 502, 503, 504],
+      },
+    },
   });
-  assert.equal(capture.requests[0].model, "gemini-3.5-flash");
+  assert.equal(capture.requests[0].model, "gemini-3.5-flash-lite");
   assert.equal(capturedTimeout, 90000);
 });
 
@@ -167,9 +204,51 @@ test("parseGoal enforces the production timeout floor over stale hosting configu
   assert.deepEqual(await parseGoal("just something tasty"), {});
   assert.deepEqual(capture.constructorOptions[0], {
     apiKey: "test-key",
-    httpOptions: { timeout: 90000 },
+    httpOptions: {
+      timeout: 90000,
+      retryOptions: {
+        attempts: 2,
+        initialDelay: 1,
+        maxDelay: 8,
+        expBase: 2,
+        jitter: 1,
+        httpStatusCodes: [408, 500, 502, 503, 504],
+      },
+    },
   });
   assert.equal(capturedTimeout, 90000);
+});
+
+test("parseGoal falls back to the bounded retry default for invalid configuration", async () => {
+  process.env.GEMINI_API_KEY = "test-key";
+  process.env.GEMINI_RETRY_ATTEMPTS = "99";
+  const capture = installSdkMock(async () => ({ text: "{}" }));
+  const { parseGoal } = require("../src/services/geminiService");
+
+  await parseGoal("quick dinner");
+
+  assert.equal(capture.constructorOptions[0].httpOptions.retryOptions.attempts, 2);
+});
+
+test("parseGoal falls back once when the primary model is capacity-limited", async () => {
+  process.env.GEMINI_API_KEY = "test-key";
+  process.env.GEMINI_MODEL = "primary-model";
+  process.env.GEMINI_FALLBACK_MODELS = "fallback-model, primary-model, invalid model";
+  const primaryError = Object.assign(new Error("high demand"), { status: 503 });
+  const capture = installSdkMock(async ({ model }) => {
+    if (model === "primary-model") throw primaryError;
+    return { text: '{"mealType":"dessert"}' };
+  });
+  const { parseGoal } = require("../src/services/geminiService");
+
+  assert.deepEqual(await parseGoal("dessert"), { mealType: "dessert" });
+  assert.deepEqual(
+    capture.requests.map(({ model }) => model),
+    ["primary-model", "fallback-model"]
+  );
+  assert.deepEqual(capture.constructorOptions[0].httpOptions.retryOptions.httpStatusCodes, [
+    408, 500, 502, 503, 504,
+  ]);
 });
 
 test("parseGoal maps empty, malformed, and non-object model output to a safe 502", async () => {

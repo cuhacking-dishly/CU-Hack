@@ -46,7 +46,7 @@ Every `VITE_` value is embedded in browser code. Never place Gemini, Spoonacular
 | `npm.cmd run test:e2e:fullstack` | Run Playwright through the real Express routes with deterministic provider boundaries. |
 | `npm.cmd run test:all` | Run lint, coverage, production build, and browser regressions. |
 
-The browser suite uses the Microsoft Edge installation already present on the demo laptop. In a clean CI environment, install Edge with Playwright before running `test:e2e`.
+The browser suite defaults to the Microsoft Edge installation already present on the demo laptop. In CI it uses Playwright Chromium by setting `PLAYWRIGHT_CHANNEL=chromium` after running `npx playwright install chromium --with-deps`.
 
 ## Application flow
 
@@ -90,7 +90,7 @@ All network access is centralized in `src/api/client.js` and uses the backend `/
 - `GET /recipes/:id`
 - `POST /swipe`
 
-Recipe pages include `{ recipes, pagination: { limit, offset, count, hasMore } }`. `count` describes the current normalized page, while `hasMore` controls whether the deck should request another page. API helpers return `response.data`, accept an optional Axios request config for cancellation, and let failures propagate to page-level error handling. Their 35-second client timeout is deliberately longer than the backend's 30-second Gemini deadline. The frontend never calls Gemini, Spoonacular, or another recipe provider directly.
+Recipe pages include `{ recipes, pagination: { limit, offset, count, hasMore } }`. `count` describes the current normalized page, while `hasMore` controls whether the deck should request another page. API helpers return `response.data`, accept an optional Axios request config for cancellation, and let failures propagate to page-level error handling. Their 100-second client timeout is deliberately longer than the backend's 90-second Gemini deadline. The frontend never calls Gemini, Spoonacular, or another recipe provider directly.
 
 The nutrition target inputs are optional and use whole numbers. Each entered
 target searches a per-serving range ±20% around that value; blank controls leave

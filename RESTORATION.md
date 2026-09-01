@@ -42,9 +42,20 @@ rewrites all paths to `index.html`; without that rule, refreshing `/deck`,
 `/liked`, or `/recipe/:id` returns a platform 404 instead of loading the SPA.
 
 Production enforces a 90-second Gemini deadline and a 100-second browser API
-deadline. Keep the browser deadline longer than the provider deadline so a
-slow provider response is reported accurately instead of becoming a generic
-client timeout.
+deadline. Dishly uses `gemini-3.5-flash-lite` for this lightweight structured
+classification and falls back to `gemini-3.6-flash` on capacity, quota,
+retired-model, network, or invalid-output failures. Each model gets at most two
+attempts for transient `408`/`5xx` failures with exponential backoff and jitter;
+`429` advances without repeatedly spending the same model's quota. The owned
+deadline covers the whole model chain. Keep the browser deadline longer than
+the provider deadline so a slow provider response is reported accurately
+instead of becoming a generic client timeout.
+
+Render builds with `npm ci`, waits for `/api/ready`, and deploys `main` only
+after the GitHub quality gate passes. That gate performs locked installs,
+production dependency audits, backend and frontend coverage, linting, a
+production build, mocked-browser regression tests, and a deterministic
+browser-to-Express integration test on Linux Chromium.
 
 ## Release verification
 
@@ -56,6 +67,11 @@ npm.cmd run setup
 npm.cmd run verify
 npm.cmd --prefix backend run test:live
 ```
+
+For a release stability pass, run the live test from `backend` with
+`LIVE_API_ITERATIONS=3`. This performs three complete Gemini parse →
+Spoonacular search → recipe detail rounds under production timeout and retry
+semantics.
 
 If port 3000 or 5173 is already used by another project, the deterministic
 full-stack browser test supports isolated ports:

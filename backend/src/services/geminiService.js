@@ -2,12 +2,20 @@ const { GoogleGenAI } = require("@google/genai");
 
 const { GOAL_FILTER_JSON_SCHEMA, normalizeGoalFilter } = require("./goalFilter");
 
-const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
+const DEFAULT_GEMINI_FALLBACK_MODELS = ["gemini-3.6-flash"];
 const DEFAULT_GEMINI_TIMEOUT_MS = 90000;
 const PRODUCTION_GEMINI_TIMEOUT_MS = 90000;
+const DEFAULT_GEMINI_RETRY_ATTEMPTS = 2;
 const MIN_TIMEOUT_MS = 100;
 const MAX_TIMEOUT_MS = 120000;
+const MIN_RETRY_ATTEMPTS = 1;
+const MAX_RETRY_ATTEMPTS = 3;
 const MAX_GOAL_TEXT_LENGTH = 1000;
+const MAX_FALLBACK_MODELS = 2;
+const MODEL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,99}$/;
+const RETRYABLE_HTTP_STATUS_CODES = [408, 500, 502, 503, 504];
+const FALLBACK_HTTP_STATUS_CODES = [404, 408, 429, 500, 502, 503, 504];
 
 const SYSTEM_INSTRUCTION = [
   "Convert a food-related goal into a recipe search filter.",
@@ -53,6 +61,20 @@ function readBoundedInteger(name, fallback, min, max) {
   return Number.isInteger(value) && value >= min && value <= max ? value : fallback;
 }
 
+function readFallbackModels(primaryModel) {
+  const rawValue = process.env.GEMINI_FALLBACK_MODELS;
+  const candidates =
+    rawValue === undefined ? DEFAULT_GEMINI_FALLBACK_MODELS : rawValue.split(",");
+
+  return [
+    ...new Set(
+      candidates
+        .map((candidate) => candidate.trim())
+        .filter((candidate) => MODEL_ID_PATTERN.test(candidate) && candidate !== primaryModel)
+    ),
+  ].slice(0, MAX_FALLBACK_MODELS);
+}
+
 function getGeminiConfig() {
   const apiKey = String(process.env.GEMINI_API_KEY || "").trim();
   if (!apiKey) {
@@ -70,9 +92,17 @@ function getGeminiConfig() {
     MAX_TIMEOUT_MS
   );
 
+  const model = String(process.env.GEMINI_MODEL || "").trim() || DEFAULT_GEMINI_MODEL;
+
   return {
     apiKey,
-    model: String(process.env.GEMINI_MODEL || "").trim() || DEFAULT_GEMINI_MODEL,
+    models: [model, ...readFallbackModels(model)],
+    retryAttempts: readBoundedInteger(
+      "GEMINI_RETRY_ATTEMPTS",
+      DEFAULT_GEMINI_RETRY_ATTEMPTS,
+      MIN_RETRY_ATTEMPTS,
+      MAX_RETRY_ATTEMPTS
+    ),
     timeoutMs:
       process.env.NODE_ENV === "production"
         ? Math.max(configuredTimeoutMs, PRODUCTION_GEMINI_TIMEOUT_MS)
@@ -120,80 +150,119 @@ function isTimeoutError(error, depth = 0) {
   return isTimeoutError(error.cause, depth + 1);
 }
 
-async function parseGoal(rawText) {
-  const text = normalizeGoalText(rawText);
-  const { apiKey, model, timeoutMs } = getGeminiConfig();
-  const abortSignal = AbortSignal.timeout(timeoutMs);
+function getErrorStatus(error, depth = 0) {
+  if (!error || depth > 3) return null;
+  const status = Number(error.status ?? error.statusCode);
+  if (Number.isInteger(status)) return status;
+  return getErrorStatus(error.cause, depth + 1);
+}
 
-  try {
-    const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: timeoutMs } });
-    const response = await ai.models.generateContent({
-      model,
-      contents: text,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseJsonSchema: GOAL_FILTER_JSON_SCHEMA,
-        thinkingConfig: { thinkingLevel: "MINIMAL" },
-        maxOutputTokens: 512,
-        abortSignal,
-      },
-    });
+function shouldTryFallback(error) {
+  if (error instanceof GeminiServiceError) return error.code === "GEMINI_INVALID_RESPONSE";
+  const status = getErrorStatus(error);
+  return status === null || FALLBACK_HTTP_STATUS_CODES.includes(status);
+}
 
-    const responseText = stripMarkdownFences(response?.text);
-    if (!responseText) {
-      throw new GeminiServiceError({
-        code: "GEMINI_INVALID_RESPONSE",
-        statusCode: 502,
-        publicMessage: "Goal parsing service returned an invalid response",
-      });
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(responseText);
-    } catch (cause) {
-      throw new GeminiServiceError({
-        code: "GEMINI_INVALID_RESPONSE",
-        statusCode: 502,
-        publicMessage: "Goal parsing service returned an invalid response",
-        cause,
-      });
-    }
-
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new GeminiServiceError({
-        code: "GEMINI_INVALID_RESPONSE",
-        statusCode: 502,
-        publicMessage: "Goal parsing service returned an invalid response",
-      });
-    }
-
-    return normalizeGoalFilter(parsed);
-  } catch (error) {
-    if (error instanceof GeminiServiceError) throw error;
-    if (abortSignal.aborted || isTimeoutError(error)) {
-      throw new GeminiServiceError({
-        code: "GEMINI_TIMEOUT",
-        statusCode: 504,
-        publicMessage: "Goal parsing service timed out",
-        retryable: true,
-        cause: error,
-      });
-    }
-
+function normalizeGeminiResponse(response) {
+  const responseText = stripMarkdownFences(response?.text);
+  if (!responseText) {
     throw new GeminiServiceError({
-      code: "GEMINI_UPSTREAM_ERROR",
+      code: "GEMINI_INVALID_RESPONSE",
       statusCode: 502,
-      publicMessage: "Goal parsing service is temporarily unavailable",
-      retryable: true,
-      cause: error,
+      publicMessage: "Goal parsing service returned an invalid response",
     });
   }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(responseText);
+  } catch (cause) {
+    throw new GeminiServiceError({
+      code: "GEMINI_INVALID_RESPONSE",
+      statusCode: 502,
+      publicMessage: "Goal parsing service returned an invalid response",
+      cause,
+    });
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new GeminiServiceError({
+      code: "GEMINI_INVALID_RESPONSE",
+      statusCode: 502,
+      publicMessage: "Goal parsing service returned an invalid response",
+    });
+  }
+
+  return normalizeGoalFilter(parsed);
+}
+
+async function parseGoal(rawText) {
+  const text = normalizeGoalText(rawText);
+  const { apiKey, models, retryAttempts, timeoutMs } = getGeminiConfig();
+  const abortSignal = AbortSignal.timeout(timeoutMs);
+  let lastError;
+
+  const ai = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      timeout: timeoutMs,
+      retryOptions: {
+        attempts: retryAttempts,
+        initialDelay: 1,
+        maxDelay: 8,
+        expBase: 2,
+        jitter: 1,
+        httpStatusCodes: RETRYABLE_HTTP_STATUS_CODES,
+      },
+    },
+  });
+
+  for (let index = 0; index < models.length; index += 1) {
+    try {
+      const response = await ai.models.generateContent({
+        model: models[index],
+        contents: text,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseJsonSchema: GOAL_FILTER_JSON_SCHEMA,
+          thinkingConfig: { thinkingLevel: "MINIMAL" },
+          maxOutputTokens: 512,
+          abortSignal,
+        },
+      });
+      return normalizeGeminiResponse(response);
+    } catch (error) {
+      lastError = error;
+      const hasFallback = index + 1 < models.length;
+      if (abortSignal.aborted || !hasFallback || !shouldTryFallback(error)) break;
+    }
+  }
+
+  if (lastError instanceof GeminiServiceError) throw lastError;
+  if (abortSignal.aborted || isTimeoutError(lastError)) {
+    throw new GeminiServiceError({
+      code: "GEMINI_TIMEOUT",
+      statusCode: 504,
+      publicMessage: "Goal parsing service timed out",
+      retryable: true,
+      cause: lastError,
+    });
+  }
+
+  throw new GeminiServiceError({
+    code: "GEMINI_UPSTREAM_ERROR",
+    statusCode: 502,
+    publicMessage: "Goal parsing service is temporarily unavailable",
+    retryable: true,
+    cause: lastError,
+  });
 }
 
 module.exports = {
+  DEFAULT_GEMINI_FALLBACK_MODELS,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_RETRY_ATTEMPTS,
   DEFAULT_GEMINI_TIMEOUT_MS,
   PRODUCTION_GEMINI_TIMEOUT_MS,
   GeminiServiceError,

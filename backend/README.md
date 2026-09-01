@@ -44,15 +44,17 @@ Put real provider keys in `.env`. Never put keys in `.env.example`, frontend env
 | --- | --- | --- | --- |
 | `PORT` | No | `3000` | HTTP port, integer `1..65535`. Invalid values stop startup. |
 | `GEMINI_API_KEY` | For goal parsing | None | Server-side Gemini API key. |
-| `GEMINI_MODEL` | No | `gemini-3.5-flash` | Gemini model used for structured goal parsing. |
+| `GEMINI_MODEL` | No | `gemini-3.5-flash-lite` | Primary Gemini model used for structured goal parsing. Flash-Lite is optimized for high-volume classification and extraction. |
+| `GEMINI_FALLBACK_MODELS` | No | `gemini-3.6-flash` | Comma-separated fallback model IDs, deduplicated and capped at two. Set an explicit blank value to disable fallback. |
 | `GEMINI_TIMEOUT_MS` | No | `90000` | Gemini timeout in milliseconds. Valid range `100..120000`; production enforces a 90-second floor so stale hosting configuration cannot restore the old flaky deadline. |
+| `GEMINI_RETRY_ATTEMPTS` | No | `2` | Total attempts per model, including the first request. Valid range `1..3`; invalid values use the default. Transient `408` and `5xx` responses are retried with exponential backoff and jitter. A `429` advances to the fallback without repeatedly spending the same model's quota. |
 | `SPOONACULAR_API_KEY` | For recipes | None | Server-side Spoonacular API key. |
 | `SPOONACULAR_TIMEOUT_MS` | No | `8000` | Spoonacular timeout in milliseconds. Valid range `100..120000`; invalid values use the default. |
 | `CORS_ORIGINS` | No | Permissive | Comma-separated exact browser origins. Blank, unset, or any `*` allows every origin. |
 
 The checked-in example allows a Vite frontend at `http://localhost:5173`. Add other exact frontend origins as a comma-separated list, without paths or trailing slashes.
 
-Goal parsing uses Gemini's `MINIMAL` thinking level because this request is a small, schema-constrained classification task. The backend does not set sampling temperature, following the current Gemini 3.5 generation guidance.
+Goal parsing uses Gemini's `MINIMAL` thinking level because this request is a small, schema-constrained classification task. The backend does not set sampling temperature, following the current Gemini 3.5 generation guidance. Transient provider failures use bounded retries with delays capped at eight seconds. Capacity, quota, retired-model, network, or invalid-output failures can advance once to the configured fallback; the 90-second abort signal remains the overall deadline across every attempt and model.
 
 ## Commands
 
@@ -467,7 +469,12 @@ Live validation is separate and opt-in because it contacts both providers and co
 npm run test:live
 ```
 
-The command fails clearly if either key is missing. It is never silently treated as a successful live check.
+The command fails clearly if either key is missing. It is never silently treated as a successful live check. Live validation forces production timeout semantics so a stale short local deadline cannot produce a misleading release failure. For a stability run, set `LIVE_API_ITERATIONS` to `2..5`; scenarios rotate across vegan, Italian, and Japanese goals and every round must parse, search, and fetch recipe detail successfully.
+
+```powershell
+$env:LIVE_API_ITERATIONS = "3"
+npm.cmd run test:live
+```
 
 Real provider calls cannot be verified without valid keys. A successful mocked suite proves request construction and normalization, not provider credentials, quota, account permissions, or current upstream availability.
 

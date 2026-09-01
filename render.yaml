@@ -1,21 +1,28 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
 services:
   - type: web
     name: recipe-match-backend
     env: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm start
+    healthCheckPath: /api/ready
+    autoDeployTrigger: checksPass
     envVars:
       - key: PORT
         value: 10000
       - key: CORS_ORIGINS
-        value: "https://your-frontend-url.vercel.app" # REPLACE THIS AFTER FRONTEND DEPLOYMENT
+        value: "https://dishly.brandonjameschoi.com"
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-3.5-flash
+        value: gemini-3.5-flash-lite
+      - key: GEMINI_FALLBACK_MODELS
+        value: gemini-3.6-flash
       - key: GEMINI_TIMEOUT_MS
         value: 90000
+      - key: GEMINI_RETRY_ATTEMPTS
+        value: 2
       - key: SPOONACULAR_API_KEY
         sync: false
       - key: SPOONACULAR_TIMEOUT_MS

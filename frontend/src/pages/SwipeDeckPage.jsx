@@ -191,7 +191,13 @@ function SwipeDeckPage() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [commitDeck, loadAttempt, navigate]);
+  }, [
+    commitDeck,
+    // The counter is a deliberate request trigger; retryDeck changes no request argument.
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies
+    loadAttempt,
+    navigate,
+  ]);
 
   const loadMoreRecipes = useCallback(async () => {
     const snapshot = deckRef.current;
@@ -282,7 +288,6 @@ function SwipeDeckPage() {
     loadMoreError,
     loadMoreRecipes,
     recipes.length,
-    deck.nextOffset,
   ]);
 
   useEffect(() => {
@@ -305,10 +310,6 @@ function SwipeDeckPage() {
     const controller = new AbortController();
     pendingSwipeControllersRef.current.add(controller);
     return controller;
-  }, []);
-
-  const releaseSwipeController = useCallback((controller) => {
-    pendingSwipeControllersRef.current.delete(controller);
   }, []);
 
   const completeSwipe = useCallback(
@@ -342,10 +343,10 @@ function SwipeDeckPage() {
         );
         return false;
       } finally {
-        releaseSwipeController(controller);
+        pendingSwipeControllersRef.current.delete(controller);
       }
     },
-    [commitDeck, createSwipeController, releaseSwipeController],
+    [commitDeck, createSwipeController],
   );
 
   const requestSwipe = useCallback(
@@ -631,11 +632,6 @@ function SwipeableRecipeCard({ recipe, swipeRequest, disabled, onSwipeStart, onS
   const isAnimatingRef = useRef(false);
   const handledRequestNumberRef = useRef(0);
   const cardRef = useRef(null);
-
-  useEffect(() => {
-    x.set(0);
-    isAnimatingRef.current = false;
-  }, [recipe.id, x]);
 
   const flyAway = useCallback(async (direction) => {
     if (isAnimatingRef.current) return;

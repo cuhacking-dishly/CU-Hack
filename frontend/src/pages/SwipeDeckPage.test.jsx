@@ -113,19 +113,16 @@ vi.mock("framer-motion", async (importOriginal) => {
 
   function useMotionValue(initialValue) {
     const valueRef = React.useRef(initialValue);
-    const motionValueRef = React.useRef(null);
-
-    if (!motionValueRef.current) {
-      motionValueRef.current = {
+    return React.useMemo(
+      () => ({
         get: () => valueRef.current,
         set: (nextValue) => {
           valueRef.current = nextValue;
         },
         on: () => () => {},
-      };
-    }
-
-    return motionValueRef.current;
+      }),
+      [valueRef],
+    );
   }
 
   return {

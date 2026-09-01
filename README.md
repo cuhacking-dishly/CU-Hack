@@ -11,7 +11,7 @@ This guide is the complete starting point for a fresh clone.
 - [Node.js 24 or later](https://nodejs.org/) (includes npm)
 - npm 11 or later
 - A Gemini API key and a Spoonacular API key to use the live app
-- Microsoft Edge only if you intend to run the Playwright browser tests
+- Microsoft Edge for the default local Playwright run, or Playwright Chromium for portable/CI runs
 
 Confirm Node and npm are available:
 
@@ -30,6 +30,8 @@ npm.cmd run setup
 ```
 
 `npm.cmd ci` installs the root development runner, and `npm.cmd run setup` installs the locked backend and frontend dependencies. Use `npm.cmd` in PowerShell to avoid the Windows execution-policy issue that can block `npm.ps1`.
+
+The backend and frontend use npm's strict install-script policy. Only reviewed, version-pinned lifecycle scripts are approved in each manifest, so a new dependency cannot silently add install-time code during CI or deployment.
 
 ### 3. Add your provider keys
 
@@ -79,6 +81,8 @@ Run these from the repository root.
 | `npm.cmd --prefix backend run test:live` | Calls the real Gemini and Spoonacular services. Requires keys and consumes provider quota. |
 | `npm.cmd --prefix frontend run build` | Creates the production frontend bundle. |
 
+Set `PLAYWRIGHT_CHANNEL=chromium` when running the browser suite with Playwright's bundled Chromium instead of the default local Edge channel. The committed GitHub Actions quality gate does this automatically and runs the same complete `verify` command on every push and pull request to `main`.
+
 ## First-run troubleshooting
 
 | Symptom | What to do |
@@ -88,7 +92,7 @@ Run these from the repository root.
 | The page loads but recipe requests fail with `503` | Check that `backend/.env` exists, both keys are filled in, and restart `npm.cmd run dev`. |
 | A port is already in use | Stop the other service using port `3000` or `5173`, then start again. The frontend intentionally keeps port `5173` so the backend CORS configuration matches. |
 | Browser requests are blocked by CORS | Keep the default frontend URL, or add the exact frontend origin to `CORS_ORIGINS` in `backend/.env` and restart the backend. |
-| `npm.cmd run test:fullstack` cannot find Edge | Install Microsoft Edge, or run the unit and API test commands separately. |
+| `npm.cmd run test:fullstack` cannot find Edge | Install Microsoft Edge, or install Playwright Chromium and set `PLAYWRIGHT_CHANNEL=chromium`. |
 
 ## Project layout
 
